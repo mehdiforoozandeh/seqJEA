@@ -140,14 +140,14 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
                     # Compute teacher feature standard deviation (across batch).
                     batch_teacher_std = teacher_output.std(dim=0).mean().item()
                     
-                    # Compute teacher entropy.
-                    teacher_probs = F.softmax((teacher_output - center) / tpt, dim=1)
+                    # Compute teacher entropy without centering or temperature scaling.
+                    teacher_probs = F.softmax(teacher_output, dim=1)
                     teacher_entropy = - (teacher_probs * torch.log(teacher_probs + 1e-7)).sum(dim=1).mean().item()
-                    
-                    # Compute student entropy for each student view and average.
+
+                    # Compute student entropy for each student view without temperature scaling.
                     student_entropies = []
                     for s_out in student_outputs:
-                        s_probs = F.softmax(s_out / tps, dim=1)
+                        s_probs = F.softmax(s_out, dim=1)
                         s_entropy = - (s_probs * torch.log(s_probs + 1e-7)).sum(dim=1).mean().item()
                         student_entropies.append(s_entropy)
                     avg_student_entropy = sum(student_entropies) / len(student_entropies)
