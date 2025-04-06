@@ -45,6 +45,17 @@ def generate_masked_views(global_view, m, mask_prob, mask_token_id, context_leng
 
 # DINO loss function
 def dino_loss(student_output, teacher_output, tps, tpt, center, loss_type="cls"):
+    if torch.isnan(student_output[0]).any():
+        print(f"student cls contains nan")
+    if torch.isnan(teacher_output[0]).any():
+        print(f"student cls contains nan")
+
+    if torch.isnan(student_output[1]).any():
+        print(f"student avg contains nan")
+    if torch.isnan(teacher_output[1]).any():
+        print(f"student avg contains nan")
+
+
     if loss_type == "cls":
         student_softmax = nn.functional.softmax(student_output[0] / tps, dim=1)  # CLS projection
         teacher_softmax = nn.functional.softmax((teacher_output[0] - center) / tpt, dim=1)  # CLS projection
@@ -94,6 +105,8 @@ def train_dino(model, teacher_model, dataloader, optimizer, device, num_epochs,
             # Teacher processes only the global view (with no gradients).
             with torch.no_grad():
                 teacher_output = teacher_model(global_view)
+
+
 
             # Compute the DINO loss over all teacher-student pairs.
             loss = 0
