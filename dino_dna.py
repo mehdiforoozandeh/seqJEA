@@ -153,7 +153,8 @@ if __name__ == "__main__":
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
     # Models
-    model = DNATransformer_ALiBi(
+    # model = DNATransformer_ALiBi(
+    model = DNATransformer_Relative(
         vocab_size=4096,
         embed_dim=embed_dim,
         num_layers=num_layers,
@@ -164,7 +165,8 @@ if __name__ == "__main__":
         dropout=dropout
     ).to(device)
 
-    teacher_model = DNATransformer_ALiBi(
+    teacher_model = DNATransformer_Relative(
+    # teacher_model = DNATransformer_ALiBi(
         vocab_size=4096,
         embed_dim=embed_dim,
         num_layers=num_layers,
