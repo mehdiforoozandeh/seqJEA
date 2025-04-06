@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import random, gc
+from tqdm import tqdm
 from torch.utils.data import DataLoader
 from data import DNADataset
 from model import DNATransformer_ALiBi  # using the ALiBi version
@@ -86,7 +87,7 @@ def dino_loss(student_output, teacher_output, student_temp, teacher_temp, center
 
 def train_dino(model, teacher_model, dataloader, optimizer, num_epochs, 
                n_subseq, m_masked, fraction, mask_prob, mask_token_id, pad_token_id, 
-               l, m, tps, tpt, loss_type="avg_pool"):
+               l, m, tps, tpt, loss_type="cls"):
     """
     Train the DINO-DNA framework with modifications.
     
@@ -97,7 +98,7 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
     - If NaN loss or CUDA OOM error is detected, the update for that batch is skipped.
     - Student parameters are updated by backpropagation; teacher parameters are updated via EMA.
     - The center vector is updated based on teacher outputs.
-    - At the end of each epoch, the average loss and average feature standard deviation (a proxy for information content)
+    - At the end of each epoch, the average loss and average teacher feature standard deviation (a proxy for information content)
       of the teacher's output are printed to monitor for collapse.
     """
     # Initialize center vector from the projection dimension (on device_student).
@@ -108,7 +109,8 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
         total_teacher_std = 0.0
         batch_count = 0
         
-        for batch in dataloader:
+        # Wrap dataloader with tqdm for progress visualization.
+        for batch in tqdm(dataloader, desc=f"Epoch {epoch+1}/{num_epochs}", leave=False):
             try:
                 optimizer.zero_grad()
                 # Move global view to student device.
@@ -129,7 +131,7 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
                     teacher_output = teacher_model(global_view.to(device_teacher))
                     teacher_output = teacher_output.to(device_student)
                     
-                    # Compute the feature standard deviation of teacher outputs (across batch).
+                    # Compute teacher feature std (across batch).
                     batch_teacher_std = teacher_output.std(dim=0).mean().item()
                 
                 # Compute loss: average DINO loss over all student views.
@@ -180,12 +182,11 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
             del global_view, subseq_views, masked_views, student_views, student_outputs, teacher_output, loss
             torch.cuda.empty_cache()
             gc.collect()
-
+        
         # Compute epoch averages.
         avg_loss = total_loss / batch_count if batch_count > 0 else float('nan')
         avg_teacher_std = total_teacher_std / batch_count if batch_count > 0 else float('nan')
         print(f"Epoch {epoch+1}/{num_epochs}, Average Loss: {avg_loss:.4f}, Avg Teacher Feature Std: {avg_teacher_std:.4f}")
-
 ####################################
 # Example Usage
 ####################################
@@ -200,16 +201,16 @@ if __name__ == "__main__":
     max_len_seq = 1000  # maximum sequence length for dataset
     context_length = 100  # model's context length (max_len for transformer)
     dropout = 0.1
-    num_epochs = 10
-    n_subseq = 2
-    m_masked = 2
-    fraction = 0.9
-    mask_prob = 0.1
+    num_epochs = 1000
+    n_subseq = 10
+    m_masked = 10
+    fraction = 0.5
+    mask_prob = 0.2
     l = 0.996
     m = 0.996
     tps = 0.1
     tpt = 0.07  # Adjusted teacher temperature for stability
-    loss_type = "avg_pool"  # Using average pooling representation
+    loss_type = "cls"  # Using average pooling representation
 
     # Load tokenizer and obtain token IDs for special tokens.
     tokenizer = AutoTokenizer.from_pretrained("zhihan1996/DNABERT-2-117M")
