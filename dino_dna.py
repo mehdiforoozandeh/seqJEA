@@ -12,6 +12,7 @@ import torch.nn.functional as F
 device_student = torch.device("cuda:0" if torch.cuda.device_count() > 0 else "cpu")
 device_teacher = torch.device("cuda:1" if torch.cuda.device_count() > 1 else device_student)
 
+print(device_student, device_teacher)
 ####################################
 # Utility Functions for Views
 ####################################
