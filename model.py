@@ -438,7 +438,7 @@ class DNATransformer_Sinusoidal(nn.Module):
 # Define the transformer encoder model
 class TransformerEncoder(nn.Module):
     def __init__(self, model_name="zhihan1996/DNABERT-2-117M", hidden_size=768, context_length=512, 
-                 mask_token_id=4, pad_token_id=1, cls_token_id=0):
+                mask_token_id=4, pad_token_id=1, cls_token_id=0):
         super(TransformerEncoder, self).__init__()
         self.encoder = AutoModel.from_pretrained(model_name)
         self.projection = nn.Linear(hidden_size, hidden_size)
