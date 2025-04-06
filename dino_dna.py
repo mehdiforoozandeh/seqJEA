@@ -4,7 +4,7 @@ import torch.optim as optim
 import random
 from torch.utils.data import DataLoader
 from data import DNADataset
-from model import DNATransformer_ALiBi
+from model import *
 from transformers import AutoTokenizer
 
 # Device configuration
