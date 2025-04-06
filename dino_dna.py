@@ -57,57 +57,64 @@ def dino_loss(student_output, teacher_output, tps, tpt, center, loss_type="cls")
     loss = -(teacher_softmax * torch.log(student_softmax + 1e-7)).sum(dim=1).mean()
     return loss
 
-# Training function
 def train_dino(model, teacher_model, dataloader, optimizer, device, num_epochs, 
                n_subseq, m_masked, fraction, mask_prob, mask_token_id, pad_token_id, 
                l, m, tps, tpt, loss_type="cls"):
     """
     Train the DINO-DNA framework with modifications.
+    
+    If the loss computed for a batch is NaN, the updates for that batch are skipped.
     """
+    # Initialize center vector based on the output dimension of the final projection layer.
     center = torch.zeros(model.projection_head[-1].out_features).to(device)
     
     for epoch in range(num_epochs):
         total_loss = 0
         for batch in dataloader:
-            global_view = batch["input_ids"].to(device)  # [batch_size, context_length]
+            # Get the global view of the input sequences.
+            global_view = batch["input_ids"].to(device)  # shape: [batch_size, context_length]
 
-            # Generate local views
+            # Generate additional views: local subsequences and masked views.
             subseq_views = generate_subsequence_views(global_view, n_subseq, fraction, model.max_len, pad_token_id)
             masked_views = generate_masked_views(global_view, m_masked, mask_prob, mask_token_id, model.max_len, pad_token_id)
             
-            # Combine views for student
+            # Combine all views for the student network.
             student_views = [global_view] + subseq_views + masked_views
 
-            # Student forward pass
+            # Forward pass: student processes all views.
             student_outputs = [model(view) for view in student_views]
 
-            # Teacher forward pass (global view only)
+            # Teacher processes only the global view (with no gradients).
             with torch.no_grad():
                 teacher_output = teacher_model(global_view)
 
-            # Compute loss
+            # Compute the DINO loss over all teacher-student pairs.
             loss = 0
             num_pairs = len(student_outputs)
             for s_output in student_outputs:
-                print(dino_loss(s_output, teacher_output, tps, tpt, center, loss_type))
                 loss += dino_loss(s_output, teacher_output, tps, tpt, center, loss_type)
             loss /= num_pairs
 
-            # Update student
+            # Check if loss is NaN: if so, skip this batch.
+            if torch.isnan(loss):
+                print("NaN loss detected, skipping parameter update for this batch.")
+                continue
+
+            # Update student network parameters.
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-            # Update teacher with EMA
+            # Update teacher network using EMA.
             for param_s, param_t in zip(model.parameters(), teacher_model.parameters()):
                 param_t.data = l * param_t.data + (1 - l) * param_s.data
 
-            # Update center
+            # Update the center using teacher output.
             with torch.no_grad():
                 if loss_type == "cls":
-                    batch_output = teacher_output[0]
+                    batch_output = teacher_output[0]  # Use CLS token projection.
                 else:
-                    batch_output = teacher_output[1]
+                    batch_output = teacher_output[1]  # Use average pooled projection.
                 center = m * center + (1 - m) * batch_output.mean(dim=0)
 
             total_loss += loss.item()
