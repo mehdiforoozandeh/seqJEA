@@ -201,11 +201,11 @@ if __name__ == "__main__":
     max_len_seq = 1000  # maximum sequence length for dataset
     context_length = 100  # model's context length (max_len for transformer)
     dropout = 0.1
-    num_epochs = 1000
+    num_epochs = 100
     n_subseq = 10
     m_masked = 10
-    fraction = 0.5
-    mask_prob = 0.2
+    fraction = 0.9
+    mask_prob = 0.1
     l = 0.996
     m = 0.996
     tps = 0.1
