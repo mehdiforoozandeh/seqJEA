@@ -8,8 +8,9 @@ from model import DNATransformer_ALiBi  # using the ALiBi version
 from transformers import AutoTokenizer
 import torch.nn.functional as F
 
-# Device configuration
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# Define two devices: one for the student and one for the teacher.
+device_student = torch.device("cuda:0" if torch.cuda.device_count() > 0 else "cpu")
+device_teacher = torch.device("cuda:1" if torch.cuda.device_count() > 1 else device_student)
 
 ####################################
 # Utility Functions for Views
@@ -51,7 +52,7 @@ def generate_masked_views(global_view, m, mask_prob, mask_token_id, context_leng
     for _ in range(m):
         masked_view = global_view.clone()
         mask_indices = torch.rand(global_view.size(), device=global_view.device) < mask_prob
-        # Ensure that the CLS token (assumed to be at index 0) remains unchanged:
+        # Ensure that the CLS token (assumed at index 0) remains unchanged.
         mask_indices[:, 0] = False
         masked_view[mask_indices] = mask_token_id
         views.append(masked_view)
@@ -79,60 +80,46 @@ def dino_loss(student_output, teacher_output, student_temp, teacher_temp, center
     return loss_val
 
 ####################################
-# Training Function
+# Training Function with Two GPUs
 ####################################
-def train_dino(model, teacher_model, dataloader, optimizer, device, num_epochs, 
+def train_dino(model, teacher_model, dataloader, optimizer, num_epochs, 
                n_subseq, m_masked, fraction, mask_prob, mask_token_id, pad_token_id, 
                l, m, tps, tpt, loss_type="avg_pool"):
     """
-    Train the DINO-DNA framework.
+    Train the DINO-DNA framework with modifications.
     
-    - Generates additional augmented views (local subsequences and masked views) for each global view.
-    - Computes DINO loss between the teacher's global view output and all student view outputs.
-    - Checks for NaN loss and skips update if detected.
-    - Updates student parameters by backpropagation and updates teacher parameters via EMA.
-    - Updates the center vector based on teacher outputs.
-    
-    Args:
-        model: Student network.
-        teacher_model: Teacher network (EMA updated).
-        dataloader: DataLoader providing tokenized DNA sequences.
-        optimizer: Optimizer for student network.
-        device: torch.device.
-        num_epochs: Number of training epochs.
-        n_subseq: Number of local subsequence views.
-        m_masked: Number of masked views.
-        fraction: Fraction of sequence length for local views.
-        mask_prob: Probability to mask tokens.
-        mask_token_id: ID for the mask token.
-        pad_token_id: ID for the pad token.
-        l: EMA momentum for teacher update.
-        m: Momentum for center update.
-        tps: Student temperature.
-        tpt: Teacher temperature.
-        loss_type: (Not used here; assume single output pooling).
+    - Student network is on device_student, teacher network on device_teacher.
+    - For each batch, additional augmented views (local subsequences and masked views) are generated.
+    - The teacher processes the global view on device_teacher, and its output is moved back to device_student.
+    - The loss is computed over all teacher-student pairs.
+    - If NaN loss is detected, the update for that batch is skipped.
+    - Student parameters are updated by backpropagation; teacher parameters are updated via EMA.
+    - The center vector is updated based on teacher outputs.
     """
-    # Initialize center vector from the projection dimension.
-    center = torch.zeros(model.projection_head[-1].out_features).to(device)
+    # Initialize center vector from the projection dimension (on device_student).
+    center = torch.zeros(model.projection_head[-1].out_features, device=device_student)
     
     for epoch in range(num_epochs):
         total_loss = 0
         for batch in dataloader:
             # Assume batch is a dict with key "input_ids" of shape [batch_size, context_length].
-            global_view = batch["input_ids"].to(device)  # Global view of all sequences.
+            global_view = batch["input_ids"].to(device_student)  # Global view on student device.
             
-            # Generate additional views.
+            # Generate additional views on device_student.
             subseq_views = generate_subsequence_views(global_view, n_subseq, fraction, model.max_len, pad_token_id)
             masked_views = generate_masked_views(global_view, m_masked, mask_prob, mask_token_id, model.max_len, pad_token_id)
             
-            # Combine views for student: global view + local views + masked views.
+            # Combine all views for the student: global view + local views + masked views.
             student_views = [global_view] + subseq_views + masked_views
 
-            # Student forward pass on all views.
+            # Student forward pass on all views (student network is on device_student).
             student_outputs = [model(view) for view in student_views]
-            # Teacher forward pass on the global view only (no gradients).
+            
+            # Teacher forward pass on the global view only.
+            # Move global_view to teacher device, then move the output back to device_student.
             with torch.no_grad():
-                teacher_output = teacher_model(global_view)
+                teacher_output = teacher_model(global_view.to(device_teacher))
+                teacher_output = teacher_output.to(device_student)
             
             # Compute loss: average DINO loss over all student views.
             loss = 0
@@ -141,21 +128,22 @@ def train_dino(model, teacher_model, dataloader, optimizer, device, num_epochs,
                 loss += dino_loss(s_out, teacher_output, tps, tpt, center)
             loss /= num_pairs
 
-            # Check if loss is NaN. If so, skip update.
+            # Check for NaN loss.
             if torch.isnan(loss):
                 print("NaN loss detected, skipping parameter update for this batch.")
                 continue
 
-            # Update student network.
+            # Update student network parameters.
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-            # Update teacher network with EMA.
+            # Update teacher network using EMA.
+            # For each student parameter on device_student, move it to teacher device before EMA update.
             for param_s, param_t in zip(model.parameters(), teacher_model.parameters()):
-                param_t.data = l * param_t.data + (1 - l) * param_s.data
+                param_t.data = l * param_t.data + (1 - l) * param_s.data.to(device_teacher)
 
-            # Update center using teacher output (global view).
+            # Update center using teacher output.
             with torch.no_grad():
                 center = m * center + (1 - m) * teacher_output.mean(dim=0)
 
@@ -199,7 +187,7 @@ if __name__ == "__main__":
     dataset = DNADataset(min_length=max_len_seq//2, max_length=max_len_seq, dataset_size=5000)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
-    # Instantiate student and teacher models.
+    # Instantiate student and teacher models on their respective devices.
     model = DNATransformer_ALiBi(
         vocab_size=4096,
         embed_dim=embed_dim,
@@ -209,7 +197,7 @@ if __name__ == "__main__":
         max_len=context_length,
         projection_dim=projection_dim,
         dropout=dropout
-    ).to(device)
+    ).to(device_student)
 
     teacher_model = DNATransformer_ALiBi(
         vocab_size=4096,
@@ -220,14 +208,15 @@ if __name__ == "__main__":
         max_len=context_length,
         projection_dim=projection_dim,
         dropout=dropout
-    ).to(device)
+    ).to(device_teacher)
 
+    # Initialize teacher with student's weights.
     teacher_model.load_state_dict(model.state_dict())
 
     # Optimizer for student model.
     optimizer = optim.SGD(model.parameters(), lr=1e-4)
 
     # Train the DINO-DNA framework.
-    train_dino(model, teacher_model, dataloader, optimizer, device, num_epochs, 
+    train_dino(model, teacher_model, dataloader, optimizer, num_epochs, 
                n_subseq, m_masked, fraction, mask_prob, mask_token_id, pad_token_id, 
                l, m, tps, tpt, loss_type)
