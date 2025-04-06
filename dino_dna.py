@@ -143,7 +143,7 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
 
                 # Check if loss is NaN.
                 if torch.isnan(loss):
-                    print("NaN loss detected, skipping parameter update for this batch.")
+                    # print("NaN loss detected, skipping parameter update for this batch.")
                     optimizer.zero_grad()
                     del global_view, subseq_views, masked_views, student_views, student_outputs, teacher_output, loss
                     torch.cuda.empty_cache()
@@ -187,13 +187,14 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
         avg_loss = total_loss / batch_count if batch_count > 0 else float('nan')
         avg_teacher_std = total_teacher_std / batch_count if batch_count > 0 else float('nan')
         print(f"Epoch {epoch+1}/{num_epochs}, Average Loss: {avg_loss:.4f}, Avg Teacher Feature Std: {avg_teacher_std:.4f}")
+
 ####################################
 # Example Usage
 ####################################
 if __name__ == "__main__":
     # Hyperparameters
     batch_size = 50
-    embed_dim = 256
+    embed_dim = 512
     num_layers = 2
     num_heads = 4
     dim_feedforward = 2 * embed_dim
