@@ -121,7 +121,7 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
             # Move global_view to teacher device, then move the output back to device_student.
             with torch.no_grad():
                 teacher_output = teacher_model(global_view.to(device_teacher))
-                teacher_output = teacher_output.to(device_student)
+                teacher_output = teacher_output.to(device_teacher)
             
             # Compute loss: average DINO loss over all student views.
             loss = 0
