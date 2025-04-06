@@ -88,6 +88,7 @@ def train_dino(model, teacher_model, dataloader, optimizer, device, num_epochs,
             loss = 0
             num_pairs = len(student_outputs)
             for s_output in student_outputs:
+                print(dino_loss(s_output, teacher_output, tps, tpt, center, loss_type))
                 loss += dino_loss(s_output, teacher_output, tps, tpt, center, loss_type)
             loss /= num_pairs
 
@@ -109,7 +110,6 @@ def train_dino(model, teacher_model, dataloader, optimizer, device, num_epochs,
                 center = m * center + (1 - m) * batch_output.mean(dim=0)
 
             total_loss += loss.item()
-            print(loss.item())
 
         avg_loss = total_loss / len(dataloader)
         print(f"Epoch {epoch+1}/{num_epochs}, Average Loss: {avg_loss:.4f}")
