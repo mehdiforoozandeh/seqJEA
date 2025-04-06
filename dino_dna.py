@@ -140,7 +140,7 @@ if __name__ == "__main__":
     dim_feedforward = 4 * embed_dim
     projection_dim = embed_dim
     max_len_seq = 3000  # Context length
-    max_len = 500  # Context length
+    max_len = 400  # Context length
     dropout = 0.1
     num_epochs = 10
     n_subseq = 2
