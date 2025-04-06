@@ -77,9 +77,9 @@ def train_dino(model, teacher_model, dataloader, optimizer, device, num_epochs,
                 print("Input Contains NaN")
                 continue
             
-            print(global_view)
-            print(global_view.shape)
-            exit()
+            # print(global_view)
+            # print(global_view.shape)
+            # exit()
 
             # Generate additional views: local subsequences and masked views.
             subseq_views = generate_subsequence_views(global_view, n_subseq, fraction, model.max_len, pad_token_id)
