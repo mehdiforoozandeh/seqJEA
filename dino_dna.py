@@ -158,7 +158,8 @@ if __name__ == "__main__":
     mask_token_id = tokenizer.mask_token_id
     pad_token_id = tokenizer.pad_token_id
     print(mask_token_id, pad_token_id, tokenizer.cls_token_id)
-    dataset = DNADataset(max_length=max_len_seq, dataset_size=5000)
+
+    dataset = DNADataset(min_length=max_len_seq//2, max_length=max_len_seq, dataset_size=5000)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
     # Models
