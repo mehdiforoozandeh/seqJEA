@@ -161,7 +161,7 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
 
                 # Check if loss is NaN.
                 if torch.isnan(loss):
-                    print("NaN loss detected, skipping parameter update for this batch.")
+                    # print("NaN loss detected, skipping parameter update for this batch.")
                     optimizer.zero_grad()
                     del global_view, subseq_views, masked_views, student_views, student_outputs, teacher_output, loss
                     torch.cuda.empty_cache()
