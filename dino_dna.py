@@ -156,6 +156,7 @@ if __name__ == "__main__":
     tokenizer = AutoTokenizer.from_pretrained("zhihan1996/DNABERT-2-117M")
     mask_token_id = tokenizer.mask_token_id
     pad_token_id = tokenizer.pad_token_id
+    print(mask_token_id, pad_token_id, tokenizer.cls_token_id)
     dataset = DNADataset(max_length=max_len, dataset_size=5000)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
