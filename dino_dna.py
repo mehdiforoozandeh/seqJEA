@@ -85,6 +85,7 @@ def dino_loss(student_output, teacher_output, student_temp, teacher_temp, center
 # Training Function with Two GPUs
 ####################################
 
+import math
 import gc
 from tqdm import tqdm
 import torch.nn.functional as F
@@ -102,8 +103,8 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
     - If NaN loss or CUDA OOM error is detected, the update for that batch is skipped.
     - Student parameters are updated by backpropagation; teacher parameters are updated via EMA.
     - The center vector is updated based on teacher outputs.
-    - At the end of each epoch, the average loss, teacher feature standard deviation, teacher entropy, 
-      and student entropy (averaged across all views) are printed to monitor for collapse.
+    - At the end of each epoch, the average loss, average teacher feature standard deviation, normalized teacher entropy, 
+      and normalized student entropy (averaged across all views) are printed to monitor for collapse.
     """
     # Initialize center vector from the projection dimension (on device_student).
     center = torch.zeros(model.projection_head[-1].out_features, device=device_student)
@@ -143,7 +144,10 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
                     # Compute teacher entropy without centering or temperature scaling.
                     teacher_probs = F.softmax(teacher_output, dim=1)
                     teacher_entropy = - (teacher_probs * torch.log(teacher_probs + 1e-7)).sum(dim=1).mean().item()
-
+                    # Normalize teacher entropy by maximum possible entropy: log(num_features).
+                    max_entropy = math.log(teacher_output.size(1))
+                    normalized_teacher_entropy = teacher_entropy / max_entropy
+                    
                     # Compute student entropy for each student view without temperature scaling.
                     student_entropies = []
                     for s_out in student_outputs:
@@ -151,6 +155,7 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
                         s_entropy = - (s_probs * torch.log(s_probs + 1e-7)).sum(dim=1).mean().item()
                         student_entropies.append(s_entropy)
                     avg_student_entropy = sum(student_entropies) / len(student_entropies)
+                    normalized_student_entropy = avg_student_entropy / max_entropy
                 
                 # Compute loss: average DINO loss over all student views.
                 loss = 0
@@ -194,8 +199,8 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
 
             total_loss += loss.item()
             total_teacher_std += batch_teacher_std
-            total_teacher_entropy += teacher_entropy
-            total_student_entropy += avg_student_entropy
+            total_teacher_entropy += normalized_teacher_entropy
+            total_student_entropy += normalized_student_entropy
             batch_count += 1
 
             # Clean up intermediate variables.
@@ -210,7 +215,6 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
         avg_student_entropy = total_student_entropy / batch_count if batch_count > 0 else float('nan')
         print(f"Epoch {epoch+1}/{num_epochs}, Avg Loss: {avg_loss:.2f}, Avg T_Std: {avg_teacher_std:.2f}, "
               f"Avg T_Ent: {avg_teacher_entropy:.2f}, Avg S_Ent: {avg_student_entropy:.2f}")
-
 ####################################
 # Example Usage
 ####################################
