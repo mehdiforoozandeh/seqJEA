@@ -97,12 +97,17 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
     - If NaN loss or CUDA OOM error is detected, the update for that batch is skipped.
     - Student parameters are updated by backpropagation; teacher parameters are updated via EMA.
     - The center vector is updated based on teacher outputs.
+    - At the end of each epoch, the average loss and average feature standard deviation (a proxy for information content)
+      of the teacher's output are printed to monitor for collapse.
     """
     # Initialize center vector from the projection dimension (on device_student).
     center = torch.zeros(model.projection_head[-1].out_features, device=device_student)
     
     for epoch in range(num_epochs):
-        total_loss = 0
+        total_loss = 0.0
+        total_teacher_std = 0.0
+        batch_count = 0
+        
         for batch in dataloader:
             try:
                 optimizer.zero_grad()
@@ -123,6 +128,9 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
                 with torch.no_grad():
                     teacher_output = teacher_model(global_view.to(device_teacher))
                     teacher_output = teacher_output.to(device_student)
+                    
+                    # Compute the feature standard deviation of teacher outputs (across batch).
+                    batch_teacher_std = teacher_output.std(dim=0).mean().item()
                 
                 # Compute loss: average DINO loss over all student views.
                 loss = 0
@@ -135,38 +143,15 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
                 if torch.isnan(loss):
                     print("NaN loss detected, skipping parameter update for this batch.")
                     optimizer.zero_grad()
-                    # Delete variables to free up memory.
                     del global_view, subseq_views, masked_views, student_views, student_outputs, teacher_output, loss
                     torch.cuda.empty_cache()
                     gc.collect()
                     continue
 
-                # Backward pass.
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-
-                # Update teacher network using EMA.
-                for param_s, param_t in zip(model.parameters(), teacher_model.parameters()):
-                    param_t.data = l * param_t.data + (1 - l) * param_s.data.to(device_teacher)
-
-                # Update center using teacher output.
-                with torch.no_grad():
-                    center = m * center + (1 - m) * teacher_output.mean(dim=0)
-
-                total_loss += loss.item()
-                print(f"Batch Loss: {loss.item():.4f}")
-
-                # Delete intermediate variables and free memory.
-                del global_view, subseq_views, masked_views, student_views, student_outputs, teacher_output, loss
-                torch.cuda.empty_cache()
-                gc.collect()
-
             except RuntimeError as e:
                 if "out of memory" in str(e):
                     print("CUDA OOM error encountered, cleaning up and skipping this batch.")
                     optimizer.zero_grad()
-                    # Delete all intermediate variables.
                     del global_view, subseq_views, masked_views, student_views, student_outputs
                     torch.cuda.empty_cache()
                     gc.collect()
@@ -174,8 +159,32 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
                 else:
                     raise e
 
-        avg_loss = total_loss / len(dataloader)
-        print(f"Epoch {epoch+1}/{num_epochs}, Average Loss: {avg_loss:.4f}")
+            # Backward pass.
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            # Update teacher network using EMA.
+            for param_s, param_t in zip(model.parameters(), teacher_model.parameters()):
+                param_t.data = l * param_t.data + (1 - l) * param_s.data.to(device_teacher)
+
+            # Update center using teacher output.
+            with torch.no_grad():
+                center = m * center + (1 - m) * teacher_output.mean(dim=0)
+
+            total_loss += loss.item()
+            total_teacher_std += batch_teacher_std
+            batch_count += 1
+
+            # Clean up intermediate variables.
+            del global_view, subseq_views, masked_views, student_views, student_outputs, teacher_output, loss
+            torch.cuda.empty_cache()
+            gc.collect()
+
+        # Compute epoch averages.
+        avg_loss = total_loss / batch_count if batch_count > 0 else float('nan')
+        avg_teacher_std = total_teacher_std / batch_count if batch_count > 0 else float('nan')
+        print(f"Epoch {epoch+1}/{num_epochs}, Average Loss: {avg_loss:.4f}, Avg Teacher Feature Std: {avg_teacher_std:.4f}")
 
 ####################################
 # Example Usage
