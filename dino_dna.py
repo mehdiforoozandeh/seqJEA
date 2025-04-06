@@ -133,14 +133,14 @@ def train_dino(model, teacher_model, dataloader, optimizer, device, num_epochs,
 # Example usage
 if __name__ == "__main__":
     # Hyperparameters
-    batch_size = 10
+    batch_size = 2
     embed_dim = 256
     num_layers = 4
     num_heads = 4
     dim_feedforward = 4 * embed_dim
     projection_dim = embed_dim
     max_len_seq = 3000  # Context length
-    max_len = 400  # Context length
+    max_len = 500  # Context length
     dropout = 0.1
     num_epochs = 10
     n_subseq = 2
