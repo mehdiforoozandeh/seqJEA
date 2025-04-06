@@ -216,8 +216,8 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
         avg_teacher_std = total_teacher_std / batch_count if batch_count > 0 else float('nan')
         avg_teacher_entropy = total_teacher_entropy / batch_count if batch_count > 0 else float('nan')
         avg_student_entropy = total_student_entropy / batch_count if batch_count > 0 else float('nan')
-        print(f"Epoch {epoch+1}/{num_epochs}, Avg Loss: {avg_loss:.2f}, Avg T_Std: {avg_teacher_std:.2f}, "
-              f"Avg T_Ent: {avg_teacher_entropy:.2f}, Avg S_Ent: {avg_student_entropy:.2f}")
+        print(f"Epoch {epoch+1}/{num_epochs}, Avg Loss: {avg_loss:.3}, Avg T_Std: {avg_teacher_std:.3f}, "
+              f"Avg T_Ent: {avg_teacher_entropy:.3f}, Avg S_Ent: {avg_student_entropy:.3}")
 
 ####################################
 # Example Usage
@@ -234,8 +234,8 @@ if __name__ == "__main__":
     context_length = 100  # model's context length (max_len for transformer)
     dropout = 0.1
     num_epochs = 100
-    n_subseq = 1
-    m_masked = 1
+    n_subseq = 5
+    m_masked = 5
     fraction = 0.9
     mask_prob = 0.1
     l = 0.996
