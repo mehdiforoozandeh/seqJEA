@@ -73,6 +73,13 @@ def train_dino(model, teacher_model, dataloader, optimizer, device, num_epochs,
         for batch in dataloader:
             # Get the global view of the input sequences.
             global_view = batch["input_ids"].to(device)  # shape: [batch_size, context_length]
+            if torch.isnan(global_view).any():
+                print("Input Contains NaN")
+                continue
+            
+            print(global_view)
+            print(global_view.shape)
+            exit()
 
             # Generate additional views: local subsequences and masked views.
             subseq_views = generate_subsequence_views(global_view, n_subseq, fraction, model.max_len, pad_token_id)
