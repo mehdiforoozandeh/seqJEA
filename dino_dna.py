@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import random
+import random, gc
 from torch.utils.data import DataLoader
 from data import DNADataset
 from model import DNATransformer_ALiBi  # using the ALiBi version
@@ -134,8 +134,12 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
             if torch.isnan(loss):
                 print("NaN loss detected, skipping parameter update for this batch.")
                 optimizer.zero_grad()
-                torch.cuda.empty_cache()  # Clean up GPU memory if NaN encountered.
+                # Delete intermediate variables explicitly.
                 del global_view, student_outputs, teacher_output
+                # Clear GPU cache.
+                torch.cuda.empty_cache()
+                # Force Python garbage collection.
+                gc.collect()
                 continue
 
             # Update student network parameters.
