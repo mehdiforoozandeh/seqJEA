@@ -85,6 +85,10 @@ def dino_loss(student_output, teacher_output, student_temp, teacher_temp, center
 # Training Function with Two GPUs
 ####################################
 
+import gc
+from tqdm import tqdm
+import torch.nn.functional as F
+
 def train_dino(model, teacher_model, dataloader, optimizer, num_epochs, 
                n_subseq, m_masked, fraction, mask_prob, mask_token_id, pad_token_id, 
                l, m, tps, tpt, loss_type="cls"):
@@ -98,8 +102,8 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
     - If NaN loss or CUDA OOM error is detected, the update for that batch is skipped.
     - Student parameters are updated by backpropagation; teacher parameters are updated via EMA.
     - The center vector is updated based on teacher outputs.
-    - At the end of each epoch, the average loss and average teacher feature standard deviation (a proxy for information content)
-      of the teacher's output are printed to monitor for collapse.
+    - At the end of each epoch, the average loss, teacher feature standard deviation, teacher entropy, 
+      and student entropy (averaged across all views) are printed to monitor for collapse.
     """
     # Initialize center vector from the projection dimension (on device_student).
     center = torch.zeros(model.projection_head[-1].out_features, device=device_student)
@@ -107,6 +111,8 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
     for epoch in range(num_epochs):
         total_loss = 0.0
         total_teacher_std = 0.0
+        total_teacher_entropy = 0.0
+        total_student_entropy = 0.0
         batch_count = 0
         
         # Wrap dataloader with tqdm for progress visualization.
@@ -131,8 +137,20 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
                     teacher_output = teacher_model(global_view.to(device_teacher))
                     teacher_output = teacher_output.to(device_student)
                     
-                    # Compute teacher feature std (across batch).
+                    # Compute teacher feature standard deviation (across batch).
                     batch_teacher_std = teacher_output.std(dim=0).mean().item()
+                    
+                    # Compute teacher entropy.
+                    teacher_probs = F.softmax((teacher_output - center) / tpt, dim=1)
+                    teacher_entropy = - (teacher_probs * torch.log(teacher_probs + 1e-7)).sum(dim=1).mean().item()
+                    
+                    # Compute student entropy for each student view and average.
+                    student_entropies = []
+                    for s_out in student_outputs:
+                        s_probs = F.softmax(s_out / tps, dim=1)
+                        s_entropy = - (s_probs * torch.log(s_probs + 1e-7)).sum(dim=1).mean().item()
+                        student_entropies.append(s_entropy)
+                    avg_student_entropy = sum(student_entropies) / len(student_entropies)
                 
                 # Compute loss: average DINO loss over all student views.
                 loss = 0
@@ -143,7 +161,7 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
 
                 # Check if loss is NaN.
                 if torch.isnan(loss):
-                    # print("NaN loss detected, skipping parameter update for this batch.")
+                    print("NaN loss detected, skipping parameter update for this batch.")
                     optimizer.zero_grad()
                     del global_view, subseq_views, masked_views, student_views, student_outputs, teacher_output, loss
                     torch.cuda.empty_cache()
@@ -176,6 +194,8 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
 
             total_loss += loss.item()
             total_teacher_std += batch_teacher_std
+            total_teacher_entropy += teacher_entropy
+            total_student_entropy += avg_student_entropy
             batch_count += 1
 
             # Clean up intermediate variables.
@@ -186,7 +206,10 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
         # Compute epoch averages.
         avg_loss = total_loss / batch_count if batch_count > 0 else float('nan')
         avg_teacher_std = total_teacher_std / batch_count if batch_count > 0 else float('nan')
-        print(f"Epoch {epoch+1}/{num_epochs}, Average Loss: {avg_loss:.4f}, Avg Teacher Feature Std: {avg_teacher_std:.4f}")
+        avg_teacher_entropy = total_teacher_entropy / batch_count if batch_count > 0 else float('nan')
+        avg_student_entropy = total_student_entropy / batch_count if batch_count > 0 else float('nan')
+        print(f"Epoch {epoch+1}/{num_epochs}, Avg Loss: {avg_loss:.2f}, Avg T_Std: {avg_teacher_std:.2f}, "
+              f"Avg T_Ent: {avg_teacher_entropy:.2f}, Avg S_Ent: {avg_student_entropy:.2f}")
 
 ####################################
 # Example Usage
