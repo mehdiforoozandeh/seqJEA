@@ -139,7 +139,8 @@ if __name__ == "__main__":
     num_heads = 4
     dim_feedforward = 4 * embed_dim
     projection_dim = embed_dim
-    max_len = 3000  # Context length
+    max_len_seq = 3000  # Context length
+    max_len = 1000  # Context length
     dropout = 0.1
     num_epochs = 10
     n_subseq = 2
@@ -157,7 +158,7 @@ if __name__ == "__main__":
     mask_token_id = tokenizer.mask_token_id
     pad_token_id = tokenizer.pad_token_id
     print(mask_token_id, pad_token_id, tokenizer.cls_token_id)
-    dataset = DNADataset(max_length=max_len, dataset_size=5000)
+    dataset = DNADataset(max_length=max_len_seq, dataset_size=5000)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
     # Models
