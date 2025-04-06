@@ -277,6 +277,7 @@ class DNATransformer_Relative(nn.Module):
         """
         super().__init__()
         self.embed_dim = embed_dim
+        self.max_len = max_len
         
         # Token embedding (learned)
         self.embedding = nn.Embedding(vocab_size, embed_dim)
