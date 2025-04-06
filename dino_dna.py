@@ -224,7 +224,7 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
 if __name__ == "__main__":
     # Hyperparameters
     batch_size = 50
-    embed_dim = 512
+    embed_dim = 256
     num_layers = 4
     num_heads = 8
     dim_feedforward = 2 * embed_dim
@@ -233,8 +233,8 @@ if __name__ == "__main__":
     context_length = 100  # model's context length (max_len for transformer)
     dropout = 0.1
     num_epochs = 100
-    n_subseq = 10
-    m_masked = 10
+    n_subseq = 100
+    m_masked = 100
     fraction = 0.9
     mask_prob = 0.1
     l = 0.996
