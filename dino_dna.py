@@ -217,15 +217,16 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
         avg_student_entropy = total_student_entropy / batch_count if batch_count > 0 else float('nan')
         print(f"Epoch {epoch+1}/{num_epochs}, Avg Loss: {avg_loss:.2f}, Avg T_Std: {avg_teacher_std:.2f}, "
               f"Avg T_Ent: {avg_teacher_entropy:.2f}, Avg S_Ent: {avg_student_entropy:.2f}")
+
 ####################################
 # Example Usage
 ####################################
 if __name__ == "__main__":
     # Hyperparameters
     batch_size = 50
-    embed_dim = 256
-    num_layers = 2
-    num_heads = 4
+    embed_dim = 512
+    num_layers = 4
+    num_heads = 8
     dim_feedforward = 2 * embed_dim
     projection_dim = embed_dim
     max_len_seq = 1000  # maximum sequence length for dataset
