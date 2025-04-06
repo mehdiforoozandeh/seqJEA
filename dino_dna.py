@@ -9,6 +9,9 @@ from model import DNATransformer_ALiBi  # using the ALiBi version
 from transformers import AutoTokenizer
 import torch.nn.functional as F
 
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:256"
+os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
+
 # Define two devices: one for the student and one for the teacher.
 device_student = torch.device("cuda:0" if torch.cuda.device_count() > 0 else "cpu")
 device_teacher = torch.device("cuda:1" if torch.cuda.device_count() > 1 else device_student)
@@ -226,7 +229,7 @@ if __name__ == "__main__":
     batch_size = 50
     embed_dim = 256
     num_layers = 4
-    num_heads = 8
+    num_heads = 4
     dim_feedforward = 2 * embed_dim
     projection_dim = embed_dim
     max_len_seq = 1000  # maximum sequence length for dataset
