@@ -223,7 +223,7 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
 ####################################
 if __name__ == "__main__":
     # Hyperparameters
-    batch_size = 100
+    batch_size = 50
     embed_dim = 256
     num_layers = 4
     num_heads = 8
