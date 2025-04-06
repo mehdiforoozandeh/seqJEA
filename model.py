@@ -172,7 +172,7 @@ class DNATransformer_ALiBi(nn.Module):
         cls_proj = self.projection_head(cls_output)  # [batch_size, projection_dim]
         pooled_proj = self.projection_head(pooled)  # [batch_size, projection_dim]
         
-        return cls_proj, pooled_proj
+        # return cls_proj, pooled_proj
         return cls_proj#, pooled_proj
 
 ########################################################
