@@ -98,11 +98,12 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
     - The center vector is updated based on teacher outputs.
     """
     # Initialize center vector from the projection dimension (on device_student).
-    center = torch.zeros(model.projection_head[-1].out_features, device=device_student)
+    center = torch.zeros(model.projection_head[-1].out_features, device=device_teacher)
     
     for epoch in range(num_epochs):
         total_loss = 0
         for batch in dataloader:
+            optimizer.zero_grad()
             # Assume batch is a dict with key "input_ids" of shape [batch_size, context_length].
             global_view = batch["input_ids"].to(device_student)  # Global view on student device.
             
@@ -134,10 +135,10 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
                 print("NaN loss detected, skipping parameter update for this batch.")
                 optimizer.zero_grad()
                 torch.cuda.empty_cache()  # Clean up GPU memory if NaN encountered.
+                del global_view, student_outputs, teacher_output
                 continue
 
             # Update student network parameters.
-            optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
