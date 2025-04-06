@@ -97,7 +97,7 @@ class DNADataset(torch.utils.data.Dataset):
         if chrom not in self.blacklist:
             return True
         tree = self.blacklist[chrom]
-        overlapping = tree.search(start, end)
+        overlapping = tree.overlap(start, end)
         return len(overlapping) == 0
 
     def sample_sequence(self):
