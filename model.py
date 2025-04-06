@@ -306,34 +306,42 @@ class DNATransformer_Relative(nn.Module):
     def forward(self, x):
         """
         x: [batch_size, seq_len] of token IDs.
-        Returns a [batch_size, projection_dim] embedding.
-        Incorporates masking for masked tokens ([MASK]=4 and [PAD]=3 are ignored).
+        Returns a tuple ([batch_size, projection_dim], [batch_size, projection_dim]):
+            - cls_proj: Projection of the CLS token embedding.
+            - pooled_proj: Projection of the mean-pooled embedding (excluding masked/padded tokens).
+        Ignores [PAD] (id=3) and [MASK] (id=4) tokens during attention and pooling.
         """
         bsz, seq_len = x.shape
         
-        # Create a key padding mask for positions to ignore (mask if token is [PAD] or [MASK])
-        # Assuming: [PAD]=3, [MASK]=4.
-        key_padding_mask = (x == 3) | (x == 4)  # shape [bsz, seq_len]
+        # Generate attention mask: True for [PAD] or [MASK] tokens to ignore them
+        key_padding_mask = (x == 3) | (x == 4)  # [batch_size, seq_len]
         
-        # Embed tokens.
-        x = self.embedding(x)  # [bsz, seq_len, embed_dim]
+        # Embed tokens
+        x = self.embedding(x)  # [batch_size, seq_len, embed_dim]
         
-        # Pass through each encoder layer.
+        # Pass through transformer layers with attention mask
         for layer in self.layers:
             x = layer(x, src_key_padding_mask=key_padding_mask)
         
-        # Mean pooling over sequence length. We exclude masked positions from the mean.
-        # To do this, compute a mask float tensor and use it to compute a weighted average.
-        mask = (~key_padding_mask).unsqueeze(-1).float()  # [bsz, seq_len, 1]
-        x = x * mask  # zero-out masked positions
-        sum_x = x.sum(dim=1)  # [bsz, embed_dim]
-        valid_counts = mask.sum(dim=1).clamp(min=1)  # avoid division by zero
-        pooled = sum_x / valid_counts  # [bsz, embed_dim]
+        # Extract CLS token output (first token, assuming [CLS] is at position 0)
+        cls_output = x[:, 0, :]  # [batch_size, embed_dim]
         
+        # Mean pooling over sequence, excluding masked/padded positions
+        mask = (~key_padding_mask).unsqueeze(-1).float()  # [batch_size, seq_len, 1]
+        x_masked = x * mask  # Zero out masked/padded positions
+        sum_x = x_masked.sum(dim=1)  # [batch_size, embed_dim]
+        valid_counts = mask.sum(dim=1).clamp(min=1)  # [batch_size, 1]
+        pooled = sum_x / valid_counts  # [batch_size, embed_dim]
+        
+        # Apply dropout
+        cls_output = self.dropout(cls_output)
         pooled = self.dropout(pooled)
-        # Projection head to get final embeddings.
-        proj = self.projection_head(pooled)  # [bsz, projection_dim]
-        return proj
+        
+        # Apply projection head to both outputs
+        cls_proj = self.projection_head(cls_output)  # [batch_size, projection_dim]
+        pooled_proj = self.projection_head(pooled)  # [batch_size, projection_dim]
+        
+        return cls_proj, pooled_proj
 
 ########################################################
 
