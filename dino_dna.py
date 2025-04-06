@@ -48,12 +48,12 @@ def dino_loss(student_output, teacher_output, tps, tpt, center, loss_type="cls")
     if torch.isnan(student_output[0]).any():
         print(f"student cls contains nan")
     if torch.isnan(teacher_output[0]).any():
-        print(f"student cls contains nan")
+        print(f"teacher cls contains nan")
 
     if torch.isnan(student_output[1]).any():
         print(f"student avg contains nan")
     if torch.isnan(teacher_output[1]).any():
-        print(f"student avg contains nan")
+        print(f"teacher avg contains nan")
 
 
     if loss_type == "cls":
