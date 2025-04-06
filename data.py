@@ -126,10 +126,10 @@ class DNADataset(torch.utils.data.Dataset):
             attempts = 0
             while sequence is None and attempts < 10:
                 sequence = self.sample_sequence()
-                print(sequence)
-                print(len(sequence))
-                print(self.tokenizer(sequence)["attention_mask"].sum())
-                exit()
+                # print(sequence)
+                # print(len(sequence))
+                # print(self.tokenizer(sequence)["attention_mask"].sum())
+                # exit()
                 attempts += 1
             if sequence is None:
                 raise ValueError("Failed to sample a valid sequence after 10 attempts.")
