@@ -132,6 +132,8 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
             # Check for NaN loss.
             if torch.isnan(loss):
                 print("NaN loss detected, skipping parameter update for this batch.")
+                optimizer.zero_grad()
+                torch.cuda.empty_cache()  # Clean up GPU memory if NaN encountered.
                 continue
 
             # Update student network parameters.
