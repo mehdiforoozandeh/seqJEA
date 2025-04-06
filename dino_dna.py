@@ -83,6 +83,7 @@ def dino_loss(student_output, teacher_output, student_temp, teacher_temp, center
 ####################################
 # Training Function with Two GPUs
 ####################################
+
 def train_dino(model, teacher_model, dataloader, optimizer, num_epochs, 
                n_subseq, m_masked, fraction, mask_prob, mask_token_id, pad_token_id, 
                l, m, tps, tpt, loss_type="avg_pool"):
@@ -93,7 +94,7 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
     - For each batch, additional augmented views (local subsequences and masked views) are generated.
     - The teacher processes the global view on device_teacher, and its output is moved back to device_student.
     - The loss is computed over all teacher-student pairs.
-    - If NaN loss is detected, the update for that batch is skipped.
+    - If NaN loss or CUDA OOM error is detected, the update for that batch is skipped.
     - Student parameters are updated by backpropagation; teacher parameters are updated via EMA.
     - The center vector is updated based on teacher outputs.
     """
@@ -103,11 +104,11 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
     for epoch in range(num_epochs):
         total_loss = 0
         for batch in dataloader:
-            optimizer.zero_grad()
-            # Assume batch is a dict with key "input_ids" of shape [batch_size, context_length].
-            global_view = batch["input_ids"].to(device_student)  # Global view on student device.
-            
             try:
+                optimizer.zero_grad()
+                # Move global view to student device.
+                global_view = batch["input_ids"].to(device_student)
+                
                 # Generate additional views.
                 subseq_views = generate_subsequence_views(global_view, n_subseq, fraction, model.max_len, pad_token_id)
                 masked_views = generate_masked_views(global_view, m_masked, mask_prob, mask_token_id, model.max_len, pad_token_id)
@@ -115,10 +116,10 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
                 # Combine views for the student.
                 student_views = [global_view] + subseq_views + masked_views
 
-                # Forward pass: student processes all views.
+                # Student forward pass on all views.
                 student_outputs = [model(view) for view in student_views]
                 
-                # Teacher forward pass on the global view only.
+                # Teacher forward pass on the global view: move global view to teacher device.
                 with torch.no_grad():
                     teacher_output = teacher_model(global_view.to(device_teacher))
                     teacher_output = teacher_output.to(device_student)
@@ -134,38 +135,44 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
                 if torch.isnan(loss):
                     print("NaN loss detected, skipping parameter update for this batch.")
                     optimizer.zero_grad()
-                    del global_view, student_views, student_outputs, teacher_output
+                    # Delete variables to free up memory.
+                    del global_view, subseq_views, masked_views, student_views, student_outputs, teacher_output, loss
                     torch.cuda.empty_cache()
                     gc.collect()
                     continue
+
+                # Backward pass.
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+                # Update teacher network using EMA.
+                for param_s, param_t in zip(model.parameters(), teacher_model.parameters()):
+                    param_t.data = l * param_t.data + (1 - l) * param_s.data.to(device_teacher)
+
+                # Update center using teacher output.
+                with torch.no_grad():
+                    center = m * center + (1 - m) * teacher_output.mean(dim=0)
+
+                total_loss += loss.item()
+                print(f"Batch Loss: {loss.item():.4f}")
+
+                # Delete intermediate variables and free memory.
+                del global_view, subseq_views, masked_views, student_views, student_outputs, teacher_output, loss
+                torch.cuda.empty_cache()
+                gc.collect()
 
             except RuntimeError as e:
                 if "out of memory" in str(e):
                     print("CUDA OOM error encountered, cleaning up and skipping this batch.")
                     optimizer.zero_grad()
-                    del global_view, student_views
+                    # Delete all intermediate variables.
+                    del global_view, subseq_views, masked_views, student_views, student_outputs
                     torch.cuda.empty_cache()
                     gc.collect()
                     continue
                 else:
                     raise e
-
-            # Continue with loss.backward(), optimizer.step(), EMA update, etc.
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-            # Update teacher network using EMA.
-            # For each student parameter on device_student, move it to teacher device before EMA update.
-            for param_s, param_t in zip(model.parameters(), teacher_model.parameters()):
-                param_t.data = l * param_t.data + (1 - l) * param_s.data.to(device_teacher)
-
-            # Update center using teacher output.
-            with torch.no_grad():
-                center = m * center + (1 - m) * teacher_output.mean(dim=0)
-
-            total_loss += loss.item()
-            print(f"Batch Loss: {loss.item():.4f}")
 
         avg_loss = total_loss / len(dataloader)
         print(f"Epoch {epoch+1}/{num_epochs}, Average Loss: {avg_loss:.4f}")
