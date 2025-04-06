@@ -107,42 +107,51 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
             # Assume batch is a dict with key "input_ids" of shape [batch_size, context_length].
             global_view = batch["input_ids"].to(device_student)  # Global view on student device.
             
-            # Generate additional views on device_student.
-            subseq_views = generate_subsequence_views(global_view, n_subseq, fraction, model.max_len, pad_token_id)
-            masked_views = generate_masked_views(global_view, m_masked, mask_prob, mask_token_id, model.max_len, pad_token_id)
-            
-            # Combine all views for the student: global view + local views + masked views.
-            student_views = [global_view] + subseq_views + masked_views
+            try:
+                # Generate additional views.
+                subseq_views = generate_subsequence_views(global_view, n_subseq, fraction, model.max_len, pad_token_id)
+                masked_views = generate_masked_views(global_view, m_masked, mask_prob, mask_token_id, model.max_len, pad_token_id)
+                
+                # Combine views for the student.
+                student_views = [global_view] + subseq_views + masked_views
 
-            # Student forward pass on all views (student network is on device_student).
-            student_outputs = [model(view) for view in student_views]
-            
-            # Teacher forward pass on the global view only.
-            # Move global_view to teacher device, then move the output back to device_student.
-            with torch.no_grad():
-                teacher_output = teacher_model(global_view.to(device_teacher))
-                teacher_output = teacher_output.to(device_student)
-            
-            # Compute loss: average DINO loss over all student views.
-            loss = 0
-            num_pairs = len(student_outputs)
-            for s_out in student_outputs:
-                loss += dino_loss(s_out, teacher_output, tps, tpt, center)
-            loss /= num_pairs
+                # Forward pass: student processes all views.
+                student_outputs = [model(view) for view in student_views]
+                
+                # Teacher forward pass on the global view only.
+                with torch.no_grad():
+                    teacher_output = teacher_model(global_view.to(device_teacher))
+                    teacher_output = teacher_output.to(device_student)
+                
+                # Compute loss: average DINO loss over all student views.
+                loss = 0
+                num_pairs = len(student_outputs)
+                for s_out in student_outputs:
+                    loss += dino_loss(s_out, teacher_output, tps, tpt, center)
+                loss /= num_pairs
 
-            # Check for NaN loss.
-            if torch.isnan(loss):
-                print("NaN loss detected, skipping parameter update for this batch.")
-                optimizer.zero_grad()
-                # Delete intermediate variables explicitly.
-                del global_view, student_outputs, teacher_output
-                # Clear GPU cache.
-                torch.cuda.empty_cache()
-                # Force Python garbage collection.
-                gc.collect()
-                continue
+                # Check if loss is NaN.
+                if torch.isnan(loss):
+                    print("NaN loss detected, skipping parameter update for this batch.")
+                    optimizer.zero_grad()
+                    del global_view, student_views, student_outputs, teacher_output
+                    torch.cuda.empty_cache()
+                    gc.collect()
+                    continue
 
-            # Update student network parameters.
+            except RuntimeError as e:
+                if "out of memory" in str(e):
+                    print("CUDA OOM error encountered, cleaning up and skipping this batch.")
+                    optimizer.zero_grad()
+                    del global_view, student_views, student_outputs, teacher_output
+                    torch.cuda.empty_cache()
+                    gc.collect()
+                    continue
+                else:
+                    raise e
+
+            # Continue with loss.backward(), optimizer.step(), EMA update, etc.
+            optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
