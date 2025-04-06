@@ -128,7 +128,7 @@ class DNADataset(torch.utils.data.Dataset):
                 sequence = self.sample_sequence()
                 print(sequence)
                 print(len(sequence))
-                print(self.tokenizer(sequence))
+                print(self.tokenizer(sequence)["attention_mask"].sum())
                 exit()
                 attempts += 1
             if sequence is None:
