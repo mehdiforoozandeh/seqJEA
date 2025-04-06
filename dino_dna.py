@@ -137,7 +137,7 @@ if __name__ == "__main__":
     embed_dim = 256
     num_layers = 4
     num_heads = 4
-    dim_feedforward = 4 * embed_dim
+    dim_feedforward = 2 * embed_dim
     projection_dim = embed_dim
     max_len_seq = 3000  # Context length
     max_len = 500  # Context length
