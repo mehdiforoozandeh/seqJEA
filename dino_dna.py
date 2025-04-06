@@ -191,7 +191,7 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
 ####################################
 if __name__ == "__main__":
     # Hyperparameters
-    batch_size = 50
+    batch_size = 100
     embed_dim = 256
     num_layers = 2
     num_heads = 4
@@ -217,7 +217,7 @@ if __name__ == "__main__":
     pad_token_id = tokenizer.pad_token_id
 
     # Create dataset and dataloader.
-    dataset = DNADataset(min_length=max_len_seq//2, max_length=max_len_seq, dataset_size=5000)
+    dataset = DNADataset(min_length=max_len_seq//2, max_length=max_len_seq, dataset_size=1000)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
     # Instantiate student and teacher models on their respective devices.
