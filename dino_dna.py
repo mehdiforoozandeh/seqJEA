@@ -140,7 +140,7 @@ if __name__ == "__main__":
     dim_feedforward = 2 * embed_dim
     projection_dim = embed_dim
     max_len_seq = 1000  # Context length
-    max_len = 200  # Context length
+    max_len = 100  # Context length
     dropout = 0.1
     num_epochs = 10
     n_subseq = 2
@@ -151,7 +151,7 @@ if __name__ == "__main__":
     m = 0.996
     tps = 0.1
     tpt = 0.04
-    loss_type = "cls"  # or "avg_pool"
+    loss_type = "avg_pool"  # or "avg_pool"
 
     # Tokenizer and dataset
     tokenizer = AutoTokenizer.from_pretrained("zhihan1996/DNABERT-2-117M")
