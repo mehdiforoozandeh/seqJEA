@@ -117,6 +117,7 @@ class DNATransformer_ALiBi(nn.Module):
         
         # Token embedding.
         self.embedding = nn.Embedding(vocab_size, embed_dim)
+        self.max_len = max_len
         
         # Stack of ALiBi-based transformer encoder layers.
         self.layers = nn.ModuleList([
