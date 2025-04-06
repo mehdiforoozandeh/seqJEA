@@ -53,7 +53,8 @@ def dino_loss(student_output, teacher_output, tps, tpt, center, loss_type="cls")
         teacher_softmax = nn.functional.softmax((teacher_output[1] - center) / tpt, dim=1)  # Avg pool projection
     else:
         raise ValueError("Invalid loss_type. Choose 'cls' or 'avg_pool'.")
-    loss = -(teacher_softmax * torch.log(student_softmax)).sum(dim=1).mean()
+    # Add epsilon to avoid log(0)
+    loss = -(teacher_softmax * torch.log(student_softmax + 1e-7)).sum(dim=1).mean()
     return loss
 
 # Training function
