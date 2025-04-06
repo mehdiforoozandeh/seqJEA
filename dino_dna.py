@@ -137,6 +137,7 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
                 with torch.no_grad():
                     teacher_output = teacher_model(global_view.to(device_teacher))
                     teacher_output = teacher_output.to(device_student)
+
                     
                     # Compute teacher feature standard deviation (across batch).
                     batch_teacher_std = teacher_output.std(dim=0).mean().item()
@@ -161,6 +162,7 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
                 loss = 0
                 num_pairs = len(student_outputs)
                 for s_out in student_outputs:
+                    print(s_out.shape, teacher_output.shape)
                     loss += dino_loss(s_out, teacher_output, tps, tpt, center)
                 loss /= num_pairs
 
