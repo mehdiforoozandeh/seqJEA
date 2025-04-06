@@ -143,7 +143,7 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
                 if "out of memory" in str(e):
                     print("CUDA OOM error encountered, cleaning up and skipping this batch.")
                     optimizer.zero_grad()
-                    # del global_view, student_views, student_outputs, teacher_output
+                    del global_view, student_views, teacher_output
                     torch.cuda.empty_cache()
                     gc.collect()
                     continue
