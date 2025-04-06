@@ -98,7 +98,7 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
     - The center vector is updated based on teacher outputs.
     """
     # Initialize center vector from the projection dimension (on device_student).
-    center = torch.zeros(model.projection_head[-1].out_features, device=device_teacher)
+    center = torch.zeros(model.projection_head[-1].out_features, device=device_student)
     
     for epoch in range(num_epochs):
         total_loss = 0
@@ -121,7 +121,7 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
             # Move global_view to teacher device, then move the output back to device_student.
             with torch.no_grad():
                 teacher_output = teacher_model(global_view.to(device_teacher))
-                teacher_output = teacher_output.to(device_teacher)
+                teacher_output = teacher_output.to(device_student)
             
             # Compute loss: average DINO loss over all student views.
             loss = 0
