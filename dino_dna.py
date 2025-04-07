@@ -344,7 +344,7 @@ if __name__ == "__main__":
     batch_size = 10
     embed_dim = 512
     num_layers = 4
-    num_heads = 4
+    num_heads = 8
     dim_feedforward = 2 * embed_dim
     projection_dim = embed_dim
     max_len_seq = 20000  # maximum sequence length for dataset
