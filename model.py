@@ -147,15 +147,14 @@ class DNATransformer_ALiBi(nn.Module):
         # Generate attention mask: True for [PAD] or [MASK] tokens to ignore them
         key_padding_mask = (x == 3) | (x == 4)  # [batch_size, seq_len]
         
+        print(x)
         # Embed tokens
         x = self.embedding(x)  # [batch_size, seq_len, embed_dim]
         
         # Pass through transformer layers with attention mask
         for layer in self.layers:
             x = layer(x, src_key_padding_mask=key_padding_mask)
-        
-        print(x.shape)
-        
+
         # Extract CLS token output (first token, assuming [CLS] is at position 0)
         cls_output = x[:, 0, :]  # [batch_size, embed_dim]
         
@@ -174,7 +173,6 @@ class DNATransformer_ALiBi(nn.Module):
         cls_proj = self.projection_head(cls_output)  # [batch_size, projection_dim]
         pooled_proj = self.projection_head(pooled)  # [batch_size, projection_dim]
         
-        # return cls_proj, pooled_proj
         return cls_proj#, pooled_proj
 
 ########################################################
