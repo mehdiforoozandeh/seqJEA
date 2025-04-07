@@ -119,24 +119,32 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
                 optimizer.zero_grad()
                 # Move global view to student device.
                 global_view = batch["input_ids"].to(device_student)
+
+                # Teacher forward pass on the global view: move global view to teacher device.
+                with torch.no_grad():
+                    teacher_output = teacher_model(global_view.to(device_teacher))
                 
                 # Generate additional views.
                 subseq_views = generate_subsequence_views(global_view, n_subseq, fraction, model.max_len, pad_token_id)
                 masked_views = generate_masked_views(global_view, m_masked, mask_prob, mask_token_id, model.max_len, pad_token_id)
                 
-                # Combine views for the student.
-                student_views = [global_view] + subseq_views + masked_views
-
-                student_views = torch.cat(student_views)
-                print(student_views.shape)
+                # # Combine views for the student.
+                # student_views = [global_view] + subseq_views + masked_views
                 
-                # Teacher forward pass on the global view: move global view to teacher device.
-                with torch.no_grad():
-                    teacher_output = teacher_model(global_view.to(device_teacher))
-                    teacher_output = teacher_output.to(device_student)
+                # # Student forward pass on all views.
+                # student_outputs = [model(view) for view in student_views]
 
-                # Student forward pass on all views.
-                student_outputs = [model(view) for view in student_views]
+                # Combine the views into one tensor.
+                student_views = [global_view] + subseq_views + masked_views  # Each is of shape [batch_size, context_length]
+                merged_views = torch.cat(student_views, dim=0)  # Shape: [n_views * batch_size, context_length]
+
+                # Perform a single forward pass on the merged batch.
+                merged_outputs = model(merged_views)  # Shape: [n_views * batch_size, projection_dim]
+
+                # If needed, reshape the outputs to group the views per original sample.
+                n_views = len(student_views)
+                batch_size = global_view.size(0)
+                student_outputs = merged_outputs.view(n_views, batch_size, -1)
                 
                 # Compute teacher feature standard deviation (across batch).
                 batch_teacher_std = teacher_output.std(dim=0).mean().item()
@@ -150,6 +158,7 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
                 
                 # Compute student entropy for each student view without temperature scaling.
                 student_entropies = []
+                teacher_output = teacher_output.to(device_student)
                 for s_out in student_outputs:
                     
                     s_probs = F.softmax(s_out, dim=1)
