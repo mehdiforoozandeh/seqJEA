@@ -124,18 +124,13 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
                 optimizer.zero_grad()
                 # Move global view to student device.
                 global_view = batch["input_ids"].to(device_student)
-
                 
                 # Generate additional views.
                 subseq_views = generate_subsequence_views(global_view, n_subseq, fraction, model.max_len, pad_token_id)
                 masked_views = generate_masked_views(global_view, m_masked, mask_prob, mask_token_id, model.max_len, pad_token_id)
                 
                 # Combine views for the student.
-                # student_views = [global_view] + subseq_views + masked_views
-                print(torch.Tensor(global_view).shape)
-                print(torch.Tensor(subseq_views).shape)
-                print(torch.Tensor(masked_views).shape)
-                exit()
+                student_views = [global_view] + subseq_views + masked_views
                 
                 # Teacher forward pass on the global view: move global view to teacher device.
                 with torch.no_grad():
@@ -315,7 +310,10 @@ if __name__ == "__main__":
     pad_token_id = tokenizer.pad_token_id
 
     # Create dataset and dataloader.
-    dataset = DNADataset(min_length=max_len_seq//2, max_length=max_len_seq, dataset_size=1000)
+    dataset = DNADataset(
+        min_length=max_len_seq//2, max_length=max_len_seq, 
+        context_length=context_length, dataset_size=1000)
+        
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
     # Instantiate student and teacher models on their respective devices.

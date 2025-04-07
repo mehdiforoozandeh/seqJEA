@@ -10,7 +10,8 @@ class DNADataset(torch.utils.data.Dataset):
         static_sample_size=10000,
         dataset_size=10000,
         min_length=200,
-        max_length=512):
+        max_length=512, 
+        context_length=500):
         """
         Initialize the DNADataset.
 
@@ -35,6 +36,7 @@ class DNADataset(torch.utils.data.Dataset):
         self.dataset_size = dataset_size
         self.min_length = min_length
         self.max_length = max_length
+        self.context_length = context_length
 
         # Load blacklist regions into IntervalTrees
         self.blacklist = self.load_blacklist(blacklist_file)
@@ -83,7 +85,7 @@ class DNADataset(torch.utils.data.Dataset):
             tokenized = tokenizer(sequence.upper(),  # Ensure uppercase for consistency
                                   return_tensors="pt",
                                   padding="max_length",
-                                  max_length=self.max_length,
+                                  max_length=self.context_length,
                                   truncation=True)
             return {
                 "input_ids": tokenized["input_ids"].squeeze(0),
