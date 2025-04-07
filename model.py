@@ -143,6 +143,8 @@ class DNATransformer_ALiBi(nn.Module):
         Ignores [PAD] (id=3) and [MASK] (id=4) tokens during attention and pooling.
         """
         bsz, seq_len = x.shape
+
+        print(x.shape)
         
         # Generate attention mask: True for [PAD] or [MASK] tokens to ignore them
         key_padding_mask = (x == 3) | (x == 4)  # [batch_size, seq_len]
