@@ -237,6 +237,8 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
         
         for batch in tqdm(dataloader, desc=f"Epoch {epoch+1}/{num_epochs}", leave=False):
             try:
+                print(batch["input_ids"])
+                print(batch["attention_mask"])
                 optimizer.zero_grad()
                 # Move global view to student device.
                 global_view = batch["input_ids"].to(device_student)
