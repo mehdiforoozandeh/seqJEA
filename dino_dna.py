@@ -88,130 +88,130 @@ def dino_loss(student_output, teacher_output, student_temp, teacher_temp, center
 ####################################
 
 # def train_dino(model, teacher_model, dataloader, optimizer, num_epochs, 
-               n_subseq, m_masked, fraction, mask_prob, mask_token_id, pad_token_id, 
-               l, m, tps, tpt):
-    """
-    Train the DINO-DNA framework with modifications.
+#                n_subseq, m_masked, fraction, mask_prob, mask_token_id, pad_token_id, 
+#                l, m, tps, tpt):
+#     """
+#     Train the DINO-DNA framework with modifications.
     
-    - Student network is on device_student, teacher network on device_teacher.
-    - For each batch, additional augmented views (local subsequences and masked views) are generated.
-    - The teacher processes the global view on device_teacher, and its output is moved back to device_student.
-    - The loss is computed over all teacher-student pairs.
-    - If NaN loss or CUDA OOM error is detected, the update for that batch is skipped.
-    - Student parameters are updated by backpropagation; teacher parameters are updated via EMA.
-    - The center vector is updated based on teacher outputs.
-    - At the end of each epoch, the average loss, average teacher feature standard deviation, normalized teacher entropy, 
-      and normalized student entropy (averaged across all views) are printed to monitor for collapse.
-    """
-    # Initialize center vector from the projection dimension (on device_student).
-    center = torch.zeros(model.projection_head[-1].out_features, device=device_student)
+#     - Student network is on device_student, teacher network on device_teacher.
+#     - For each batch, additional augmented views (local subsequences and masked views) are generated.
+#     - The teacher processes the global view on device_teacher, and its output is moved back to device_student.
+#     - The loss is computed over all teacher-student pairs.
+#     - If NaN loss or CUDA OOM error is detected, the update for that batch is skipped.
+#     - Student parameters are updated by backpropagation; teacher parameters are updated via EMA.
+#     - The center vector is updated based on teacher outputs.
+#     - At the end of each epoch, the average loss, average teacher feature standard deviation, normalized teacher entropy, 
+#       and normalized student entropy (averaged across all views) are printed to monitor for collapse.
+#     """
+#     # Initialize center vector from the projection dimension (on device_student).
+#     center = torch.zeros(model.projection_head[-1].out_features, device=device_student)
     
-    for epoch in range(num_epochs):
-        total_loss = 0.0
-        total_teacher_std = 0.0
-        total_teacher_entropy = 0.0
-        total_student_entropy = 0.0
-        batch_count = 0
+#     for epoch in range(num_epochs):
+#         total_loss = 0.0
+#         total_teacher_std = 0.0
+#         total_teacher_entropy = 0.0
+#         total_student_entropy = 0.0
+#         batch_count = 0
         
-        # Wrap dataloader with tqdm for progress visualization.
-        for batch in tqdm(dataloader, desc=f"Epoch {epoch+1}/{num_epochs}", leave=False):
-            try:
-                optimizer.zero_grad()
-                # Move global view to student device.
-                global_view = batch["input_ids"].to(device_student)
+#         # Wrap dataloader with tqdm for progress visualization.
+#         for batch in tqdm(dataloader, desc=f"Epoch {epoch+1}/{num_epochs}", leave=False):
+#             try:
+#                 optimizer.zero_grad()
+#                 # Move global view to student device.
+#                 global_view = batch["input_ids"].to(device_student)
                 
-                # Teacher forward pass on the global view: move global view to teacher device.
-                with torch.no_grad():
-                    teacher_output = teacher_model(global_view.to(device_teacher))
-                    teacher_output = teacher_output.to(device_student)
+#                 # Teacher forward pass on the global view: move global view to teacher device.
+#                 with torch.no_grad():
+#                     teacher_output = teacher_model(global_view.to(device_teacher))
+#                     teacher_output = teacher_output.to(device_student)
                 
-                # Generate additional views.
-                subseq_views = generate_subsequence_views(global_view, n_subseq, fraction, model.max_len, pad_token_id)
-                masked_views = generate_masked_views(global_view, m_masked, mask_prob, mask_token_id, model.max_len, pad_token_id)
+#                 # Generate additional views.
+#                 subseq_views = generate_subsequence_views(global_view, n_subseq, fraction, model.max_len, pad_token_id)
+#                 masked_views = generate_masked_views(global_view, m_masked, mask_prob, mask_token_id, model.max_len, pad_token_id)
                 
-                # Combine views for the student.
-                student_views = [global_view] + subseq_views + masked_views
+#                 # Combine views for the student.
+#                 student_views = [global_view] + subseq_views + masked_views
                 
-                # Student forward pass on all views.
-                student_outputs = [model(view) for view in student_views]
+#                 # Student forward pass on all views.
+#                 student_outputs = [model(view) for view in student_views]
                 
-                # Compute teacher feature standard deviation (across batch).
-                batch_teacher_std = teacher_output.std(dim=0).mean().item()
+#                 # Compute teacher feature standard deviation (across batch).
+#                 batch_teacher_std = teacher_output.std(dim=0).mean().item()
                 
-                # Compute teacher entropy without centering or temperature scaling.
-                teacher_probs = F.softmax(teacher_output, dim=1)
-                teacher_entropy = - (teacher_probs * torch.log(teacher_probs + 1e-7)).sum(dim=1).mean().item()
-                # Normalize teacher entropy by maximum possible entropy: log(num_features).
-                max_entropy = math.log(teacher_output.size(1))
-                normalized_teacher_entropy = teacher_entropy / max_entropy
+#                 # Compute teacher entropy without centering or temperature scaling.
+#                 teacher_probs = F.softmax(teacher_output, dim=1)
+#                 teacher_entropy = - (teacher_probs * torch.log(teacher_probs + 1e-7)).sum(dim=1).mean().item()
+#                 # Normalize teacher entropy by maximum possible entropy: log(num_features).
+#                 max_entropy = math.log(teacher_output.size(1))
+#                 normalized_teacher_entropy = teacher_entropy / max_entropy
                 
-                # Compute student entropy for each student view without temperature scaling.
-                student_entropies = []
-                for s_out in student_outputs:
-                    s_probs = F.softmax(s_out, dim=1)
-                    s_entropy = - (s_probs * torch.log(s_probs + 1e-7)).sum(dim=1).mean().item()
-                    student_entropies.append(s_entropy)
-                avg_student_entropy = sum(student_entropies) / len(student_entropies)
-                normalized_student_entropy = avg_student_entropy / max_entropy
+#                 # Compute student entropy for each student view without temperature scaling.
+#                 student_entropies = []
+#                 for s_out in student_outputs:
+#                     s_probs = F.softmax(s_out, dim=1)
+#                     s_entropy = - (s_probs * torch.log(s_probs + 1e-7)).sum(dim=1).mean().item()
+#                     student_entropies.append(s_entropy)
+#                 avg_student_entropy = sum(student_entropies) / len(student_entropies)
+#                 normalized_student_entropy = avg_student_entropy / max_entropy
                 
-                # Compute loss: average DINO loss over all student views.
-                loss = 0
-                num_pairs = len(student_outputs)
-                for s_out in student_outputs:
-                    loss += dino_loss(s_out, teacher_output.to(device_student), tps, tpt, center)
-                loss /= num_pairs
+#                 # Compute loss: average DINO loss over all student views.
+#                 loss = 0
+#                 num_pairs = len(student_outputs)
+#                 for s_out in student_outputs:
+#                     loss += dino_loss(s_out, teacher_output.to(device_student), tps, tpt, center)
+#                 loss /= num_pairs
 
-                # Check if loss is NaN.
-                if torch.isnan(loss):
-                    # print("NaN loss detected, skipping parameter update for this batch.")
-                    optimizer.zero_grad()
-                    del global_view, subseq_views, masked_views, student_views, student_outputs, teacher_output, loss
-                    torch.cuda.empty_cache()
-                    gc.collect()
-                    continue
+#                 # Check if loss is NaN.
+#                 if torch.isnan(loss):
+#                     # print("NaN loss detected, skipping parameter update for this batch.")
+#                     optimizer.zero_grad()
+#                     del global_view, subseq_views, masked_views, student_views, student_outputs, teacher_output, loss
+#                     torch.cuda.empty_cache()
+#                     gc.collect()
+#                     continue
 
-            except RuntimeError as e:
-                if "out of memory" in str(e):
-                    print("CUDA OOM error encountered, cleaning up and skipping this batch.")
-                    optimizer.zero_grad()
-                    # del global_view, subseq_views, masked_views, student_views, student_outputs
-                    torch.cuda.empty_cache()
-                    gc.collect()
-                    continue
-                else:
-                    raise e
+#             except RuntimeError as e:
+#                 if "out of memory" in str(e):
+#                     print("CUDA OOM error encountered, cleaning up and skipping this batch.")
+#                     optimizer.zero_grad()
+#                     # del global_view, subseq_views, masked_views, student_views, student_outputs
+#                     torch.cuda.empty_cache()
+#                     gc.collect()
+#                     continue
+#                 else:
+#                     raise e
 
-            # Backward pass.
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+#             # Backward pass.
+#             optimizer.zero_grad()
+#             loss.backward()
+#             optimizer.step()
 
-            # Update teacher network using EMA.
-            for param_s, param_t in zip(model.parameters(), teacher_model.parameters()):
-                param_t.data = l * param_t.data + (1 - l) * param_s.data.to(device_teacher)
+#             # Update teacher network using EMA.
+#             for param_s, param_t in zip(model.parameters(), teacher_model.parameters()):
+#                 param_t.data = l * param_t.data + (1 - l) * param_s.data.to(device_teacher)
 
-            # Update center using teacher output.
-            with torch.no_grad():
-                center = m * center + (1 - m) * teacher_output.mean(dim=0)
+#             # Update center using teacher output.
+#             with torch.no_grad():
+#                 center = m * center + (1 - m) * teacher_output.mean(dim=0)
 
-            total_loss += loss.item()
-            total_teacher_std += batch_teacher_std
-            total_teacher_entropy += normalized_teacher_entropy
-            total_student_entropy += normalized_student_entropy
-            batch_count += 1
+#             total_loss += loss.item()
+#             total_teacher_std += batch_teacher_std
+#             total_teacher_entropy += normalized_teacher_entropy
+#             total_student_entropy += normalized_student_entropy
+#             batch_count += 1
 
-            # Clean up intermediate variables.
-            del global_view, subseq_views, masked_views, student_views, student_outputs, teacher_output, loss
-            torch.cuda.empty_cache()
-            gc.collect()
+#             # Clean up intermediate variables.
+#             del global_view, subseq_views, masked_views, student_views, student_outputs, teacher_output, loss
+#             torch.cuda.empty_cache()
+#             gc.collect()
         
-        # Compute epoch averages.
-        avg_loss = total_loss / batch_count if batch_count > 0 else float('nan')
-        avg_teacher_std = total_teacher_std / batch_count if batch_count > 0 else float('nan')
-        avg_teacher_entropy = total_teacher_entropy / batch_count if batch_count > 0 else float('nan')
-        avg_student_entropy = total_student_entropy / batch_count if batch_count > 0 else float('nan')
-        print(f"Epoch {epoch+1}/{num_epochs}, Avg Loss: {avg_loss:.3}, Avg T_Std: {avg_teacher_std:.3f}, "
-              f"Avg T_Ent: {avg_teacher_entropy:.3f}, Avg S_Ent: {avg_student_entropy:.3}")
+#         # Compute epoch averages.
+#         avg_loss = total_loss / batch_count if batch_count > 0 else float('nan')
+#         avg_teacher_std = total_teacher_std / batch_count if batch_count > 0 else float('nan')
+#         avg_teacher_entropy = total_teacher_entropy / batch_count if batch_count > 0 else float('nan')
+#         avg_student_entropy = total_student_entropy / batch_count if batch_count > 0 else float('nan')
+#         print(f"Epoch {epoch+1}/{num_epochs}, Avg Loss: {avg_loss:.3}, Avg T_Std: {avg_teacher_std:.3f}, "
+#               f"Avg T_Ent: {avg_teacher_entropy:.3f}, Avg S_Ent: {avg_student_entropy:.3}")
 
 def train_dino(model, teacher_model, dataloader, optimizer, num_epochs, 
                n_subseq, m_masked, fraction, mask_prob, mask_token_id, pad_token_id, 
@@ -339,7 +339,7 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
         avg_student_entropy = total_student_entropy / batch_count if batch_count > 0 else float('nan')
         print(f"Epoch {epoch+1}/{num_epochs}, Avg Loss: {avg_loss:.3}, Avg T_Std: {avg_teacher_std:.3f}, "
               f"Avg T_Ent: {avg_teacher_entropy:.3f}, Avg S_Ent: {avg_student_entropy:.3}")
-              
+
 ####################################
 # Example Usage
 ####################################
