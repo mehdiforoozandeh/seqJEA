@@ -19,7 +19,6 @@ print(device_student, device_teacher)
 ####################################
 # Utility Functions for Views
 ####################################
-
 def pad_to_context_length(sequences, context_length, pad_token_id):
     """Pad each sequence (assumed to be a tensor of shape [batch, seq_len]) to context_length."""
     padded_sequences = []
@@ -346,17 +345,17 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
 if __name__ == "__main__":
     # Hyperparameters
     batch_size = 10
-    embed_dim = 512
+    embed_dim = 256
     num_layers = 4
-    num_heads = 8
+    num_heads = 4
     dim_feedforward = 2 * embed_dim
     projection_dim = embed_dim
     max_len_seq = 20000  # maximum sequence length for dataset
     context_length = 500  # model's context length (max_len for transformer)
     dropout = 0.1
     num_epochs = 100
-    n_subseq = 5
-    m_masked = 5
+    n_subseq = 2
+    m_masked = 2
     fraction = 0.8
     mask_prob = 0.2
     l = 0.996
