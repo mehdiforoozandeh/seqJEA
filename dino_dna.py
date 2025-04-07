@@ -124,6 +124,10 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
                 optimizer.zero_grad()
                 # Move global view to student device.
                 global_view = batch["input_ids"].to(device_student)
+
+                # Teacher forward pass on the global view: move global view to teacher device.
+                with torch.no_grad():
+                    teacher_output = teacher_model(global_view.to(device_teacher))
                 
                 # Generate additional views.
                 subseq_views = generate_subsequence_views(global_view, n_subseq, fraction, model.max_len, pad_token_id)
@@ -131,39 +135,36 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
                 
                 # Combine views for the student.
                 student_views = [global_view] + subseq_views + masked_views
+                student_views = torch.cat(student_views)
+                print(student_views.shape)
 
                 # Student forward pass on all views.
                 student_outputs = [model(view) for view in student_views]
                 
-                # Teacher forward pass on the global view: move global view to teacher device.
-                with torch.no_grad():
-                    teacher_output = teacher_model(global_view.to(device_teacher))
-                    teacher_output = teacher_output.to(device_student)
-                    
-                    # Compute teacher feature standard deviation (across batch).
-                    batch_teacher_std = teacher_output.std(dim=0).mean().item()
-                    
-                    # Compute teacher entropy without centering or temperature scaling.
-                    teacher_probs = F.softmax(teacher_output, dim=1)
-                    teacher_entropy = - (teacher_probs * torch.log(teacher_probs + 1e-7)).sum(dim=1).mean().item()
-                    # Normalize teacher entropy by maximum possible entropy: log(num_features).
-                    max_entropy = math.log(teacher_output.size(1))
-                    normalized_teacher_entropy = teacher_entropy / max_entropy
-                    
-                    # Compute student entropy for each student view without temperature scaling.
-                    student_entropies = []
-                    for s_out in student_outputs:
-                        s_probs = F.softmax(s_out, dim=1)
-                        s_entropy = - (s_probs * torch.log(s_probs + 1e-7)).sum(dim=1).mean().item()
-                        student_entropies.append(s_entropy)
-                    avg_student_entropy = sum(student_entropies) / len(student_entropies)
-                    normalized_student_entropy = avg_student_entropy / max_entropy
+                # Compute teacher feature standard deviation (across batch).
+                batch_teacher_std = teacher_output.std(dim=0).mean().item()
+                
+                # Compute teacher entropy without centering or temperature scaling.
+                teacher_probs = F.softmax(teacher_output, dim=1)
+                teacher_entropy = - (teacher_probs * torch.log(teacher_probs + 1e-7)).sum(dim=1).mean().item()
+                # Normalize teacher entropy by maximum possible entropy: log(num_features).
+                max_entropy = math.log(teacher_output.size(1))
+                normalized_teacher_entropy = teacher_entropy / max_entropy
+                
+                # Compute student entropy for each student view without temperature scaling.
+                student_entropies = []
+                for s_out in student_outputs:
+                    s_probs = F.softmax(s_out, dim=1)
+                    s_entropy = - (s_probs * torch.log(s_probs + 1e-7)).sum(dim=1).mean().item()
+                    student_entropies.append(s_entropy)
+                avg_student_entropy = sum(student_entropies) / len(student_entropies)
+                normalized_student_entropy = avg_student_entropy / max_entropy
                 
                 # Compute loss: average DINO loss over all student views.
                 loss = 0
                 num_pairs = len(student_outputs)
                 for s_out in student_outputs:
-                    loss += dino_loss(s_out, teacher_output, tps, tpt, center)
+                    loss += dino_loss(s_out, teacher_output.to(device_student), tps, tpt, center)
                 loss /= num_pairs
 
                 # Check if loss is NaN.
