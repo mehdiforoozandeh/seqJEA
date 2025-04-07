@@ -347,4 +347,4 @@ if __name__ == "__main__":
     # Train the DINO-DNA framework.
     train_dino(model, teacher_model, dataloader, optimizer, num_epochs, 
                n_subseq, m_masked, fraction, mask_prob, mask_token_id, pad_token_id, 
-               l, m, tps, tpt, loss_type)
+               l, m, tps, tpt)
