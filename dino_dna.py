@@ -342,7 +342,7 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
 if __name__ == "__main__":
     # Hyperparameters
     batch_size = 10
-    embed_dim = 256
+    embed_dim = 512
     num_layers = 4
     num_heads = 4
     dim_feedforward = 2 * embed_dim
@@ -400,8 +400,8 @@ if __name__ == "__main__":
     teacher_model.load_state_dict(model.state_dict())
 
     # Optimizer for student model.
-    optimizer = optim.SGD(model.parameters(), lr=1e-2)
-    # optimizer = optim.Adam(model.parameters(), lr=1e-3)
+    # optimizer = optim.SGD(model.parameters(), lr=1e-2)
+    optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
     # Train the DINO-DNA framework.
     train_dino(model, teacher_model, dataloader, optimizer, num_epochs, 
