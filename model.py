@@ -145,7 +145,7 @@ class DNATransformer_ALiBi(nn.Module):
         bsz, seq_len = x.shape
         
         # Generate attention mask: True for [PAD] or [MASK] tokens to ignore them
-        key_padding_mask = (x == 3) | (x == 4)  # [batch_size, seq_len]
+        key_padding_mask = (x == 3) | (x == 4) | (x == 2)  # [batch_size, seq_len]
         
         # Embed tokens
         x = self.embedding(x)  # [batch_size, seq_len, embed_dim]

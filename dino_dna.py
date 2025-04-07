@@ -13,7 +13,10 @@ os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
 # Define two devices: one for the student and one for the teacher.
 device_student = torch.device("cuda:0" if torch.cuda.device_count() > 0 else "cpu")
-device_teacher = torch.device("cuda:1" if torch.cuda.device_count() > 1 else device_student)
+device_teacher = device_student
+# device_teacher = torch.device("cuda:1" if torch.cuda.device_count() > 1 else device_student)
+
+
 
 print(device_student, device_teacher)
 ####################################
@@ -237,8 +240,6 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
         
         for batch in tqdm(dataloader, desc=f"Epoch {epoch+1}/{num_epochs}", leave=False):
             try:
-                print(batch["input_ids"])
-                print(batch["attention_mask"])
                 optimizer.zero_grad()
                 # Move global view to student device.
                 global_view = batch["input_ids"].to(device_student)
