@@ -127,7 +127,7 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
                 # Combine views for the student.
                 student_views = [global_view] + subseq_views + masked_views
 
-                student_views = torch.stack(student_views)
+                student_views = torch.cat(student_views)
                 print(student_views.shape)
                 
                 # Teacher forward pass on the global view: move global view to teacher device.
