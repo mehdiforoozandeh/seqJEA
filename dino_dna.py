@@ -11,14 +11,8 @@ import torch.nn.functional as F
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:256"
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
-# Define two devices: one for the student and one for the teacher.
-device_student = torch.device("cuda:0" if torch.cuda.device_count() > 0 else "cpu")
-device_teacher = device_student
-# device_teacher = torch.device("cuda:1" if torch.cuda.device_count() > 1 else device_student)
+device_teacher = device_student = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-
-
-print(device_student, device_teacher)
 ####################################
 # Utility Functions for Views
 ####################################
