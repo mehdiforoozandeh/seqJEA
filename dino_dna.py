@@ -105,6 +105,7 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
     """
     # Initialize center vector from the projection dimension (on device_student).
     center = torch.zeros(model.projection_head[-1].out_features, device=device_student)
+    print(center.shape)
     
     for epoch in range(num_epochs):
         total_loss = 0.0
