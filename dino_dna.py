@@ -279,7 +279,7 @@ if __name__ == "__main__":
     teacher_model.load_state_dict(model.state_dict())
 
     # Optimizer for student model.
-    optimizer = optim.SGD(model.parameters(), lr=1e-4)
+    optimizer = optim.SGD(model.parameters(), lr=1e-2)
     # optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
     # Train the DINO-DNA framework.
