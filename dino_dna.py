@@ -131,9 +131,11 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
                 masked_views = generate_masked_views(global_view, m_masked, mask_prob, mask_token_id, model.max_len, pad_token_id)
                 
                 # Combine views for the student.
-                student_views = [global_view] + subseq_views + masked_views
-                student_views = torch.cat(student_views)
-                print(student_views.shape)
+                # student_views = [global_view] + subseq_views + masked_views
+                print(global_view.shape)
+                print(subseq_views.shape)
+                print(masked_views.shape)
+                exit()
                 
                 # Teacher forward pass on the global view: move global view to teacher device.
                 with torch.no_grad():
