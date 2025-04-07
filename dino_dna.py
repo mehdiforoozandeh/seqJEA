@@ -87,11 +87,6 @@ def dino_loss(student_output, teacher_output, student_temp, teacher_temp, center
 # Training Function with Two GPUs
 ####################################
 
-import math
-import gc
-from tqdm import tqdm
-import torch.nn.functional as F
-
 def train_dino(model, teacher_model, dataloader, optimizer, num_epochs, 
                n_subseq, m_masked, fraction, mask_prob, mask_token_id, pad_token_id, 
                l, m, tps, tpt):
@@ -288,15 +283,15 @@ if __name__ == "__main__":
     batch_size = 10
     embed_dim = 512
     num_layers = 4
-    num_heads = 4
+    num_heads = 8
     dim_feedforward = 2 * embed_dim
     projection_dim = embed_dim
-    max_len_seq = 20000  # maximum sequence length for dataset
-    context_length = 500  # model's context length (max_len for transformer)
+    max_len_seq = 50000  # maximum sequence length for dataset
+    context_length = 1000  # model's context length (max_len for transformer)
     dropout = 0.1
     num_epochs = 100
-    n_subseq = 2
-    m_masked = 2
+    n_subseq = 5
+    m_masked = 5
     fraction = 0.8
     mask_prob = 0.2
     l = 0.996
