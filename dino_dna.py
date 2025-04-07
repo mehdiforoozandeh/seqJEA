@@ -1,6 +1,6 @@
 import torch.nn as nn
 import torch.optim as optim
-import random, gc, os, torch
+import random, gc, os, torch, math
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 from data import DNADataset
