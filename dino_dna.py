@@ -139,7 +139,6 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
                 with torch.no_grad():
                     teacher_output = teacher_model(global_view.to(device_teacher))
                     teacher_output = teacher_output.to(device_student)
-
                     
                     # Compute teacher feature standard deviation (across batch).
                     batch_teacher_std = teacher_output.std(dim=0).mean().item()
@@ -280,8 +279,8 @@ if __name__ == "__main__":
     teacher_model.load_state_dict(model.state_dict())
 
     # Optimizer for student model.
-    # optimizer = optim.SGD(model.parameters(), lr=1e-4)
-    optimizer = optim.Adam(model.parameters(), lr=1e-3)
+    optimizer = optim.SGD(model.parameters(), lr=1e-4)
+    # optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
     # Train the DINO-DNA framework.
     train_dino(model, teacher_model, dataloader, optimizer, num_epochs, 
