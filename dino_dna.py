@@ -223,7 +223,7 @@ from torch.cuda.amp import autocast, GradScaler
 
 def train_dino(model, teacher_model, dataloader, optimizer, num_epochs, 
                n_subseq, m_masked, fraction, mask_prob, mask_token_id, pad_token_id, 
-               l, m, tps, tpt, device_student='cuda:0', device_teacher='cuda:1', loss_type="cls"):
+               l, m, tps, tpt):
     # Initialize mixed precision scaler
     scaler = GradScaler()
     
