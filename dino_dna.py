@@ -218,67 +218,67 @@ import torch.nn.functional as F
 #         print(f"Epoch {epoch+1}/{num_epochs}, Avg Loss: {avg_loss:.3}, Avg T_Std: {avg_teacher_std:.3f}, "
 #               f"Avg T_Ent: {avg_teacher_entropy:.3f}, Avg S_Ent: {avg_student_entropy:.3}")
 
-for batch in tqdm(dataloader, desc=f"Epoch {epoch+1}/{num_epochs}", leave=False):
-    try:
-        optimizer.zero_grad()
-        global_view = batch["input_ids"].to(device_student)
-        
-        # Compute teacher output once (with no gradient tracking)
-        with torch.no_grad():
-            teacher_output = teacher_model(global_view.to(device_teacher))
-            teacher_output = teacher_output.to(device_student)
-        
-        loss_total = 0.0
-        count = 0
-        
-        # Process the global view
-        student_output = model(global_view)
-        loss_total += dino_loss(student_output, teacher_output, tps, tpt, center)
-        count += 1
-        del student_output
-        torch.cuda.empty_cache()
-        
-        # Generate augmented views (sequentially process them)
-        aug_views = []
-        aug_views.extend(generate_subsequence_views(global_view, n_subseq, fraction, model.max_len, pad_token_id))
-        aug_views.extend(generate_masked_views(global_view, m_masked, mask_prob, mask_token_id, model.max_len, pad_token_id))
-        
-        # Process each augmented view one at a time
-        for view in aug_views:
-            student_output = model(view)
-            loss_total += dino_loss(student_output, teacher_output, tps, tpt, center)
-            count += 1
-            del student_output, view  # Free memory immediately
-            torch.cuda.empty_cache()
-        
-        # Average the loss over all views and backpropagate
-        loss_total /= count
-        
-        # Backward pass and optimizer step
-        loss_total.backward()
-        optimizer.step()
-        
-        # Update teacher network using EMA and update center
-        for param_s, param_t in zip(model.parameters(), teacher_model.parameters()):
-            param_t.data = l * param_t.data + (1 - l) * param_s.data.to(device_teacher)
-        with torch.no_grad():
-            center = m * center + (1 - m) * teacher_output.mean(dim=0)
-            
-        # Clean up
-        del global_view, teacher_output, loss_total
-        torch.cuda.empty_cache()
-        gc.collect()
-        
-    except RuntimeError as e:
-        if "out of memory" in str(e):
-            print("CUDA OOM error encountered, cleaning up and skipping this batch.")
-            optimizer.zero_grad()
-            torch.cuda.empty_cache()
-            gc.collect()
-            continue
-        else:
-            raise e
+import torch
+from torch.cuda.amp import autocast, GradScaler
 
+def train_dino(model, teacher_model, dataloader, optimizer, num_epochs, 
+               n_subseq, m_masked, fraction, mask_prob, mask_token_id, pad_token_id, 
+               l, m, tps, tpt, device_student='cuda:0', device_teacher='cuda:1', loss_type="cls"):
+    # Initialize mixed precision scaler
+    scaler = GradScaler()
+    
+    for epoch in range(num_epochs):
+        for batch in dataloader:
+            # Zero gradients at the start of the batch
+            optimizer.zero_grad()
+            
+            # Move global view to student device
+            global_view = batch["input_ids"].to(device_student)  # Shape: [batch_size, context_length]
+            
+            # Teacher processes global view (no gradients)
+            with torch.no_grad():
+                teacher_output = teacher_model(global_view.to(device_teacher)).to(device_student)
+            
+            # Generate augmented views
+            views = [global_view]  # Start with global view
+            subseq_views = generate_subsequence_views(global_view, n_subseq, fraction, pad_token_id)
+            masked_views = generate_masked_views(global_view, m_masked, mask_prob, mask_token_id, pad_token_id)
+            views.extend(subseq_views)
+            views.extend(masked_views)
+            
+            # Process each view sequentially
+            total_loss = 0.0
+            num_views = len(views)
+            for view in views:
+                with autocast():
+                    # Student forward pass
+                    student_output = model(view)
+                    # Compute DINO loss (e.g., cross-entropy between student and teacher outputs)
+                    loss = dino_loss(student_output, teacher_output, tps, tpt, center=l, momentum=m)
+                    total_loss += loss.item()
+                    
+                    # Scale loss and accumulate gradients
+                    scaled_loss = loss / num_views
+                    scaler.scale(scaled_loss).backward()
+                
+                # Free memory by deleting intermediate tensors
+                del view, student_output, loss, scaled_loss
+                torch.cuda.empty_cache()
+            
+            # Perform optimizer step with accumulated gradients
+            scaler.step(optimizer)
+            scaler.update()
+            optimizer.zero_grad()
+            
+            # Update teacher weights (e.g., exponential moving average) and center
+            with torch.no_grad():
+                for param_t, param_s in zip(teacher_model.parameters(), model.parameters()):
+                    param_t.data = tps * param_t.data + (1 - tps) * param_s.data.to(device_teacher)
+                # Update center if applicable
+                # center = update_center(center, teacher_output, momentum=m)
+            
+            # Optional: Log total_loss for monitoring
+            print(f"Epoch {epoch}, Loss: {total_loss / num_views:.4f}")
 
 ####################################
 # Example Usage
