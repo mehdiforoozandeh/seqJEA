@@ -86,7 +86,7 @@ class DNADataset(torch.utils.data.Dataset):
                                   return_tensors="pt",
                                   padding="max_length",
                                   max_length=self.context_length,
-                                  truncation=True)
+                                  truncation=False)
             return {
                 "input_ids": tokenized["input_ids"].squeeze(0),
                 "attention_mask": tokenized["attention_mask"].squeeze(0)
