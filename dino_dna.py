@@ -124,7 +124,6 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
                 with torch.no_grad():
                     teacher_output = teacher_model(global_view.to(device_teacher))
                     teacher_output = teacher_output.to(device_student)
-                    print(teacher_output.shape)
                 
                 # Generate additional views.
                 subseq_views = generate_subsequence_views(global_view, n_subseq, fraction, model.max_len, pad_token_id)
@@ -149,7 +148,6 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
                 # Compute student entropy for each student view without temperature scaling.
                 student_entropies = []
                 for s_out in student_outputs:
-                    
                     s_probs = F.softmax(s_out, dim=1)
                     s_entropy = - (s_probs * torch.log(s_probs + 1e-7)).sum(dim=1).mean().item()
                     student_entropies.append(s_entropy)
