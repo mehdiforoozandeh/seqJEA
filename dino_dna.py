@@ -135,6 +135,7 @@ def train_dino(model, teacher_model, dataloader, optimizer, num_epochs,
                 # Teacher forward pass on the global view: move global view to teacher device.
                 with torch.no_grad():
                     teacher_output = teacher_model(global_view.to(device_teacher))
+                    teacher_output = teacher_output.to(device_student)
 
                 # Student forward pass on all views.
                 student_outputs = [model(view) for view in student_views]
@@ -313,7 +314,7 @@ if __name__ == "__main__":
     dataset = DNADataset(
         min_length=max_len_seq//2, max_length=max_len_seq, 
         context_length=context_length, dataset_size=1000)
-        
+
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
     # Instantiate student and teacher models on their respective devices.
