@@ -74,7 +74,7 @@ class BenchmarkEvaluator:
             "GUE/prom/prom_core_all/",
             "GUE/splice/reconstructed/",
             "GUE/tf/0/"], 
-        batch_size=32, mode="dev"):
+        batch_size=256, mode="dev"):
         """
         Initialize the evaluator with the model, tokenizer, and benchmark directories.
         
