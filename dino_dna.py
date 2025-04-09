@@ -503,8 +503,9 @@ class DINO:
                 total_student_entropy += normalized_student_entropy
                 batch_count += 1
 
-                self.clean_up_intermediates(global_view, subseq_views, masked_views, student_views,
-                                            merged_views, merged_student_outputs, student_outputs, teacher_output, loss)
+                self.clean_up_intermediates(
+                    global_view, subseq_views, masked_views, student_views,
+                    merged_views, merged_student_outputs, student_outputs, teacher_output, loss)
 
             # Compute epoch averages.
             avg_loss = total_loss / batch_count if batch_count > 0 else float('nan')
@@ -585,7 +586,7 @@ if __name__ == "__main__":
     teacher_model.load_state_dict(model.state_dict())
 
     # Optimizer for student model.
-    optimizer = optim.SGD(model.parameters(), lr=1e-4)
+    optimizer = optim.SGD(model.parameters(), lr=1e-3)
     # optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
     # Train the DINO-DNA framework.
