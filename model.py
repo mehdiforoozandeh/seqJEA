@@ -465,6 +465,9 @@ from transformers import AutoModel, AutoTokenizer
 # Vocabulary size constant
 VOCAB_SIZE = 4096
 
+# Set device to GPU if available, otherwise CPU
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 class UnifiedDNATransformer(nn.Module):
     """
     A unified transformer model for DNA sequences that integrates four different transformer variants:
@@ -780,7 +783,7 @@ class UnifiedDNATransformer(nn.Module):
 
         elif model_type == 'dnabert2':
             # DNABERT2 (TransformerEncoder) implementation
-            self.encoder = AutoModel.from_pretrained(model_name)
+            self.encoder = AutoModel.from_pretrained(model_name, trust_remote_code=True)
             hidden_size = self.encoder.config.hidden_size
             self.projection = nn.Linear(hidden_size, projection_dim)
             # Token IDs based on DNABERT-2 defaults
@@ -860,10 +863,10 @@ if __name__ == "__main__":
         print(f"\nTesting {model_type} model")
         
         # Initialize the model with the specified type
-        model = UnifiedDNATransformer(model_type=model_type)
+        model = UnifiedDNATransformer(model_type=model_type).to(device)
         
         # Perform forward pass
-        output = model(inputs)
+        output = model(inputs.to(device))
         
         # Print output shape to confirm correctness
         print(f"Output shape: {output.shape}")
