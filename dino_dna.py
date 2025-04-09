@@ -228,7 +228,7 @@ if __name__ == "__main__":
     context_length = 512  # model's context length (max_len for transformer)
     dropout = 0.1
     num_epochs = 100
-    n_subseq = 2
+    n_subseq = 5
     m_masked = 2
     fraction = 0.5
     mask_prob = 0.5
@@ -279,7 +279,7 @@ if __name__ == "__main__":
     teacher_model.load_state_dict(model.state_dict())
 
     # Optimizer for student model.
-    optimizer = optim.SGD(model.parameters(), lr=1e-3)
+    optimizer = optim.SGD(model.parameters(), lr=1e-4)
     # optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
     # Train the DINO-DNA framework.
