@@ -323,7 +323,7 @@ class DINO:
             print(f"Epoch {epoch+1}/{self.num_epochs}, Loss: {avg_loss:.3}, T_Std: {avg_teacher_std:.3f}, "
                   f"T_Ent: {avg_teacher_entropy:.3f}, S_Ent: {avg_student_entropy:.3f}")
             
-            if epoch%5==0:
+            if (epoch+1)%20==0:
                 self.benchmark.model = self.model
                 self.benchmark.run_all_benchmarks()
 
