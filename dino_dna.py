@@ -540,7 +540,7 @@ if __name__ == "__main__":
     l = 0.99
     m = 0.99
     tps = 0.5
-    tpt = 0.1  # Adjusted teacher temperature for stability
+    tpt = 0.05  # Adjusted teacher temperature for stability
 
     # Load tokenizer and obtain token IDs for special tokens.
     tokenizer = AutoTokenizer.from_pretrained("zhihan1996/DNABERT-2-117M")
