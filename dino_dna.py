@@ -420,7 +420,8 @@ class DINO:
             total_student_entropy = 0.0
             batch_count = 0
 
-            for batch in tqdm(self.dataloader, desc=f"Epoch {epoch+1}/{self.num_epochs}", leave=False):
+            pbar = tqdm(self.dataloader, desc=f"Epoch {epoch+1}/{self.num_epochs}", leave=False)
+            for batch in pbar:
                 try:
                     self.optimizer.zero_grad()
                     # Move global view (input_ids) to the student device.
@@ -500,6 +501,9 @@ class DINO:
                 total_teacher_entropy += normalized_teacher_entropy
                 total_student_entropy += normalized_student_entropy
                 batch_count += 1
+
+                # Update tqdm postfix with current batch loss.
+                pbar.set_postfix({'batch_loss': f"{loss.item():.3f}"})
 
                 self.clean_up_intermediates(
                     global_view, subseq_views, masked_views, student_views,
