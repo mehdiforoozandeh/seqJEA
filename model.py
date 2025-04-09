@@ -460,7 +460,7 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoModel, AutoTokenizer, AutoConfig
 
 # Vocabulary size constant
 VOCAB_SIZE = 4096
@@ -783,11 +783,11 @@ class UnifiedDNATransformer(nn.Module):
 
         elif model_type == 'dnabert2':
             # DNABERT2 (TransformerEncoder) implementation
-            config = BertConfig.from_pretrained("zhihan1996/DNABERT-2-117M")
+            # Use AutoConfig to load the pretrained configuration.
+            config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
             self.encoder = AutoModel.from_pretrained(model_name, trust_remote_code=True, config=config)
             hidden_size = self.encoder.config.hidden_size
             self.projection = nn.Linear(hidden_size, projection_dim)
-            # Token IDs based on DNABERT-2 defaults
             self.pad_token_id = 1
             self.mask_token_id = 4
 
