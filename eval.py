@@ -45,6 +45,7 @@ def get_embeddings(model, tokenizer, sequences, context_length, batch_size=256):
                 max_length=context_length)
 
             input_ids = tokenized["input_ids"].to(device)
+            print(input_ids.shape)
             batch_embeddings = model(input_ids)
             embeddings_list.append(batch_embeddings.cpu())
     
