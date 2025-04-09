@@ -232,7 +232,6 @@ class DINO:
                     self.optimizer.zero_grad()
                     # Move global view (input_ids) to the student device.
                     global_view = batch["input_ids"].to(self.device_student)
-                    print(global_view)
                     
                     # Compute teacher output on teacher device then move to student device.
                     with torch.no_grad():
@@ -337,14 +336,14 @@ if __name__ == "__main__":
     # Hyperparameters
 
     model_type = "alibi"
-    batch_size = 10
+    batch_size = 5
     embed_dim = 384
     num_layers = 6
     num_heads = 6
     dim_feedforward = 2 * embed_dim
     projection_dim = embed_dim
     max_len_seq = 3000  # maximum sequence length for dataset
-    context_length = 512  # model's context length (max_len for transformer)
+    context_length = 1024  # model's context length (max_len for transformer)
     dropout = 0.1
     num_epochs = 1500
     n_subseq = 2
