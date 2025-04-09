@@ -534,7 +534,7 @@ if __name__ == "__main__":
     context_length = 512  # model's context length (max_len for transformer)
     dropout = 0.1
     num_epochs = 100
-    n_subseq = 5
+    n_subseq = 2
     m_masked = 2
     fraction = 0.5
     mask_prob = 0.5
