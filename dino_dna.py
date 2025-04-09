@@ -390,8 +390,8 @@ class DINO:
         teacher_output = teacher_output.detach()
         
         # Apply softmax with temperature scaling.
-        s_probs = F.softmax(student_output / student_temp, dim=1)
-        t_probs = F.softmax((teacher_output - center) / teacher_temp, dim=1)
+        s_probs = F.softmax(student_output / tps, dim=1)
+        t_probs = F.softmax((teacher_output - center) / tpt, dim=1)
         
         # Cross-entropy loss; add a small epsilon to avoid log(0).
         loss_val = - (t_probs * torch.log(s_probs + 1e-7)).sum(dim=1).mean()
