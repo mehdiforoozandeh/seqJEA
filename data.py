@@ -1,5 +1,6 @@
 import torch, pysam, random
 from transformers import AutoTokenizer
+from intervaltree import IntervalTree
 
 class DNADataset(torch.utils.data.Dataset):
     def __init__(self,
