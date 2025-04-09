@@ -539,7 +539,7 @@ if __name__ == "__main__":
     mask_prob = 0.5
     l = 0.99
     m = 0.99
-    tps = 1
+    tps = 0.5
     tpt = 0.1  # Adjusted teacher temperature for stability
 
     # Load tokenizer and obtain token IDs for special tokens.
