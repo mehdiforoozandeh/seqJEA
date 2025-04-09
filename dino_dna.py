@@ -381,24 +381,21 @@ class DINO:
 
     def dino_loss(self, student_output, teacher_output, tps, tpt, center):
         """
-        A placeholder implementation of the DINO loss.
-        In practice, DINO loss involves cross-view comparisons, temperature scaling, and centering.
-        Here, for demonstration, we compute the mean squared error between normalized outputs.
-        
-        Args:
-            student_output (Tensor): Student network output [batch, projection_dim].
-            teacher_output (Tensor): Teacher network output [batch, projection_dim].
-            tps, tpt: Temperature parameters.
-            center (Tensor): Center vector for student output centering.
-        
-        Returns:
-            Tensor: Computed loss.
+            Compute the DINO loss between teacher and student outputs.
+            
+            Both teacher_output and student_output are assumed to be of shape [batch_size, projection_dim].
+            Temperature scaling is applied to both, with teacher outputs centered.
         """
-        # Normalize outputs after centering for the student.
-        student_norm = F.normalize(student_output - center, p=2, dim=1)
-        teacher_norm = F.normalize(teacher_output, p=2, dim=1)
-        loss = F.mse_loss(student_norm, teacher_norm)
-        return loss
+        # Stop gradient on teacher.
+        teacher_output = teacher_output.detach()
+        
+        # Apply softmax with temperature scaling.
+        s_probs = F.softmax(student_output / student_temp, dim=1)
+        t_probs = F.softmax((teacher_output - center) / teacher_temp, dim=1)
+        
+        # Cross-entropy loss; add a small epsilon to avoid log(0).
+        loss_val = - (t_probs * torch.log(s_probs + 1e-7)).sum(dim=1).mean()
+        return loss_val
 
     def train_dino(self):
         """
@@ -471,8 +468,9 @@ class DINO:
                     # Skip the batch if loss is NaN.
                     if torch.isnan(loss):
                         self.optimizer.zero_grad()
-                        self.clean_up_intermediates(global_view, subseq_views, masked_views, student_views,
-                                                    merged_views, merged_student_outputs, student_outputs, teacher_output, loss)
+                        self.clean_up_intermediates(
+                            global_view, subseq_views, masked_views, student_views,
+                            merged_views, merged_student_outputs, student_outputs, teacher_output, loss)
                         continue
 
                 except RuntimeError as e:
@@ -590,13 +588,13 @@ if __name__ == "__main__":
     # optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
     # Train the DINO-DNA framework.
-    train_dino(model, teacher_model, dataloader, optimizer, num_epochs, 
-               n_subseq, m_masked, fraction, mask_prob, mask_token_id, pad_token_id, 
-               l, m, tps, tpt)
+    # train_dino(model, teacher_model, dataloader, optimizer, num_epochs, 
+    #            n_subseq, m_masked, fraction, mask_prob, mask_token_id, pad_token_id, 
+    #            l, m, tps, tpt)
 
 
-    # dino = DINO(model, teacher_model, dataloader, optimizer, num_epochs, 
-    #     n_subseq, m_masked, fraction, mask_prob, mask_token_id, pad_token_id, 
-    #     l, m, tps, tpt, device_student, device_teacher)
+    dino = DINO(model, teacher_model, dataloader, optimizer, num_epochs, 
+        n_subseq, m_masked, fraction, mask_prob, mask_token_id, pad_token_id, 
+        l, m, tps, tpt, device_student, device_teacher)
 
-    # dino.train_dino()
+    dino.train_dino()
