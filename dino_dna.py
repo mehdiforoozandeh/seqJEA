@@ -230,8 +230,8 @@ if __name__ == "__main__":
     num_epochs = 100
     n_subseq = 2
     m_masked = 2
-    fraction = 0.7
-    mask_prob = 0.3
+    fraction = 0.5
+    mask_prob = 0.5
     l = 0.99
     m = 0.99
     tps = 0.5
