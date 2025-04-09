@@ -502,6 +502,7 @@ class UnifiedDNATransformer(nn.Module):
             kwargs.pop("context_length", None)
         elif self.model_type in ["bert2", "dnabert2"]:
             kwargs.pop("vocab_size", None)
+            kwargs.pop("embed_dim", None)
         
         # Instantiate the corresponding model variant.
         if self.model_type == "alibi":
