@@ -510,10 +510,8 @@ class DINO:
             avg_teacher_std = total_teacher_std / batch_count if batch_count > 0 else float('nan')
             avg_teacher_entropy = total_teacher_entropy / batch_count if batch_count > 0 else float('nan')
             avg_student_entropy = total_student_entropy / batch_count if batch_count > 0 else float('nan')
-            print(f"Epoch {epoch+1}/{self.num_epochs}, Avg Loss: {avg_loss:.3}, Avg T_Std: {avg_teacher_std:.3f}, "
-                  f"Avg T_Ent: {avg_teacher_entropy:.3f}, Avg S_Ent: {avg_student_entropy:.3f}")
-
-
+            print(f"Epoch {epoch+1}/{self.num_epochs}, Loss: {avg_loss:.3}, T_Std: {avg_teacher_std:.3f}, "
+                  f"T_Ent: {avg_teacher_entropy:.3f}, S_Ent: {avg_student_entropy:.3f}")
 
 
 ####################################
@@ -538,7 +536,7 @@ if __name__ == "__main__":
     fraction = 0.5
     mask_prob = 0.5
     l = 0.99
-    m = 0.99
+    m = 0.95
     tps = 0.5
     tpt = 0.05  # Adjusted teacher temperature for stability
 
