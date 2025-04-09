@@ -597,3 +597,5 @@ if __name__ == "__main__":
     dino = DINO(model, teacher_model, dataloader, optimizer, num_epochs, 
         n_subseq, m_masked, fraction, mask_prob, mask_token_id, pad_token_id, 
         l, m, tps, tpt, device_student, device_teacher)
+
+    dino.train_dino()
