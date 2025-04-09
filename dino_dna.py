@@ -218,7 +218,7 @@ if __name__ == "__main__":
     # Hyperparameters
 
     model_type = "alibi"
-    batch_size = 5
+    batch_size = 10
     embed_dim = 384
     num_layers = 6
     num_heads = 6
@@ -246,7 +246,7 @@ if __name__ == "__main__":
     # Create dataset and dataloader.
     dataset = DNADataset(
         min_length=max_len_seq//2, max_length=max_len_seq, 
-        context_length=context_length, dataset_size=1000)
+        context_length=context_length, dataset_size=100)
 
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
