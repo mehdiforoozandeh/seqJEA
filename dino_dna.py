@@ -4,7 +4,7 @@ import random, gc, os, torch, math
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 from data import DNADataset
-from model import DNATransformer_ALiBi  # using the ALiBi version
+from model import *  # using the ALiBi version
 from transformers import AutoTokenizer
 import torch.nn.functional as F
 
