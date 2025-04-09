@@ -781,18 +781,8 @@ class UnifiedDNATransformer(nn.Module):
                 )
                 self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
 
-        elif model_type == 'dnabert2':
-            # DNABERT2 (TransformerEncoder) implementation
-            # Use AutoConfig to load the pretrained configuration.
-            config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
-            self.encoder = AutoModel.from_pretrained(model_name, trust_remote_code=True, config=config)
-            hidden_size = self.encoder.config.hidden_size
-            self.projection = nn.Linear(hidden_size, projection_dim)
-            self.pad_token_id = 1
-            self.mask_token_id = 4
-
         else:
-            raise ValueError("Invalid model_type. Choose from ['alibi', 'relative', 'sinusoidal', 'dnabert2']")
+            raise ValueError("Invalid model_type. Choose from ['alibi', 'relative', 'sinusoidal']")
 
     ### Forward Pass ###
 
@@ -830,15 +820,6 @@ class UnifiedDNATransformer(nn.Module):
             cls_proj = self.projection_head(cls_output)
             return cls_proj
 
-        elif self.model_type == 'dnabert2':
-            exit()
-            # Attention mask: 1 for tokens to attend to, 0 for PAD and MASK
-            attention_mask = (x != self.pad_token_id) & (x != self.mask_token_id)
-            outputs = self.encoder(x, attention_mask=attention_mask)
-            cls_output = outputs.last_hidden_state[:, 0, :]
-            cls_proj = self.projection(cls_output)
-            return cls_proj
-
 if __name__ == "__main__":
     from transformers import AutoTokenizer
     import torch
@@ -859,7 +840,7 @@ if __name__ == "__main__":
     print(f"Max token id: {inputs.max().item()}")
     
     # Define all model types to test
-    model_types = ['alibi', 'relative', 'sinusoidal', 'dnabert2']
+    model_types = ['alibi', 'relative', 'sinusoidal']
     
     # Test each model variant
     for model_type in model_types:
