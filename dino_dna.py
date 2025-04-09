@@ -536,7 +536,7 @@ if __name__ == "__main__":
     fraction = 0.5
     mask_prob = 0.5
     l = 0.99
-    m = 0.95
+    m = 0.99
     tps = 0.5
     tpt = 0.05  # Adjusted teacher temperature for stability
 
