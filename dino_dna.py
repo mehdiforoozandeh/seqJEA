@@ -589,13 +589,13 @@ if __name__ == "__main__":
     # optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
     # Train the DINO-DNA framework.
-    # train_dino(model, teacher_model, dataloader, optimizer, num_epochs, 
-    #            n_subseq, m_masked, fraction, mask_prob, mask_token_id, pad_token_id, 
-    #            l, m, tps, tpt)
+    train_dino(model, teacher_model, dataloader, optimizer, num_epochs, 
+               n_subseq, m_masked, fraction, mask_prob, mask_token_id, pad_token_id, 
+               l, m, tps, tpt)
 
 
-    dino = DINO(model, teacher_model, dataloader, optimizer, num_epochs, 
-        n_subseq, m_masked, fraction, mask_prob, mask_token_id, pad_token_id, 
-        l, m, tps, tpt, device_student, device_teacher)
+    # dino = DINO(model, teacher_model, dataloader, optimizer, num_epochs, 
+    #     n_subseq, m_masked, fraction, mask_prob, mask_token_id, pad_token_id, 
+    #     l, m, tps, tpt, device_student, device_teacher)
 
-    dino.train_dino()
+    # dino.train_dino()
