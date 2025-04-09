@@ -69,7 +69,7 @@ class BenchmarkEvaluator:
         self, model, tokenizer, 
         benchmark_dirs=[
             "GUE/prom/prom_300_all/", 
-            "GUE/EMP/H3K4me3/",
+            # "GUE/EMP/H3K4me3/",
             "GUE/prom/prom_core_all/",
             "GUE/splice/reconstructed/",
             "GUE/tf/0/"], 
@@ -122,14 +122,26 @@ class BenchmarkEvaluator:
         Returns:
             float: ROC AUC score.
         """
+        # Load development data.
         df = pd.read_csv(dev_csv)
         sequences = df['sequence'].tolist()
         labels = df['label'].tolist()
-        embeddings = get_embeddings(self.model, self.tokenizer, sequences, self.context_length, self.batch_size)
+        
+        # Extract embeddings from the model.
+        embeddings = get_embeddings(self.model, self.tokenizer, sequences, self.batch_size)
         X = embeddings.numpy()
         y = np.array(labels)
-        probs = probe.predict_proba(X)[:, 1]
-        auc = roc_auc_score(y, probs)
+        
+        # Predict probabilities for the positive class.
+        # If the problem is binary classification (two unique labels), then predict_proba returns two columns.
+        # Otherwise, for multiclass, we need to tell roc_auc_score how to handle them.
+        probs = probe.predict_proba(X)
+        
+        # If binary classification, use only the probability for the positive class.
+        if len(np.unique(y)) == 2:
+            auc = roc_auc_score(y, probs[:, 1])
+        else:
+            auc = roc_auc_score(y, probs, multi_class='ovr')
         return auc
 
     def run_benchmark(self, benchmark_dir):
