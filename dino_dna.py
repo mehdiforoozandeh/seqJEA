@@ -325,7 +325,7 @@ class DINO:
                   f"T_Ent: {avg_teacher_entropy:.3f}, S_Ent: {avg_student_entropy:.3f}")
             
             # if epoch == 0 or (epoch+1)%150==0:
-            if epoch == 0 or (epoch+1)%150==0:
+            if (epoch+1)%150==0:
                 self.benchmark.model = self.model
                 self.benchmark.run_all_benchmarks()
 
@@ -343,7 +343,7 @@ if __name__ == "__main__":
     num_heads = 6
     dim_feedforward = 2 * embed_dim
     projection_dim = embed_dim
-    max_len_seq = 5000  # maximum sequence length for dataset
+    max_len_seq = 3000  # maximum sequence length for dataset
     context_length = 512  # model's context length (max_len for transformer)
     dropout = 0.1
     num_epochs = 1500
