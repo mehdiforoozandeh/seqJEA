@@ -5,7 +5,7 @@ import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 
-def get_embeddings(model, tokenizer, sequences, batch_size=32):
+def get_embeddings(model, tokenizer, sequences, context_length, batch_size=32):
     """
     Given a UnifiedDNATransformer model, an initialized tokenizer, and a list of DNA sequences,
     this function computes the CLS token embeddings in batches.
@@ -38,7 +38,12 @@ def get_embeddings(model, tokenizer, sequences, batch_size=32):
         for i in range(0, len(sequences), batch_size):
             batch = sequences[i: i + batch_size]
 
-            tokenized = tokenizer(batch, return_tensors="pt", padding=True, truncation=True)
+            tokenized = tokenizer(
+                batch, return_tensors="pt", 
+                truncation=True,
+                padding="max_length",
+                max_length=context_length)
+
             input_ids = tokenized["input_ids"].to(device)
             batch_embeddings = model(input_ids)
             embeddings_list.append(batch_embeddings.cpu())
@@ -84,6 +89,7 @@ class BenchmarkEvaluator:
         self.batch_size = batch_size
         self.benchmark_dirs = benchmark_dirs
         self.mode = mode
+        self.context_length = self.model.max_len
 
     def train_probe(self, train_csv):
         """
@@ -98,7 +104,7 @@ class BenchmarkEvaluator:
         df = pd.read_csv(train_csv)
         sequences = df['sequence'].tolist()
         labels = df['label'].tolist()
-        embeddings = get_embeddings(self.model, self.tokenizer, sequences, self.batch_size)
+        embeddings = get_embeddings(self.model, self.tokenizer, sequences, self.context_length, self.batch_size)
         X = embeddings.numpy()
         y = np.array(labels)
         probe = LogisticRegression(max_iter=1000)
@@ -119,7 +125,7 @@ class BenchmarkEvaluator:
         df = pd.read_csv(dev_csv)
         sequences = df['sequence'].tolist()
         labels = df['label'].tolist()
-        embeddings = get_embeddings(self.model, self.tokenizer, sequences, self.batch_size)
+        embeddings = get_embeddings(self.model, self.tokenizer, sequences, self.context_length, self.batch_size)
         X = embeddings.numpy()
         y = np.array(labels)
         probs = probe.predict_proba(X)[:, 1]
