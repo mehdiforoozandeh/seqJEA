@@ -107,7 +107,6 @@ class DNADataset(torch.utils.data.Dataset):
         chrom = random.choices(self.chroms, weights=chrom_lengths, k=1)[0]
         chrom_len = self.chrom_lengths[chrom]
         length = random.randint(self.min_length, self.max_length)
-        print(length)
         if chrom_len < length:
             return None
         max_start = chrom_len - length
@@ -129,10 +128,7 @@ class DNADataset(torch.utils.data.Dataset):
             attempts = 0
             while sequence is None and attempts < 10:
                 sequence = self.sample_sequence()
-                # print(sequence)
-                # print(len(sequence))
-                # print(self.tokenizer(sequence)["attention_mask"].sum())
-                # exit()
+
                 attempts += 1
             if sequence is None:
                 raise ValueError("Failed to sample a valid sequence after 10 attempts.")
