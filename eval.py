@@ -45,7 +45,6 @@ def get_embeddings(model, tokenizer, sequences, context_length, batch_size=256):
                 max_length=context_length)
 
             input_ids = tokenized["input_ids"].to(device)
-            print(input_ids.shape)
             batch_embeddings = model(input_ids)
             embeddings_list.append(batch_embeddings.cpu())
     
@@ -70,11 +69,11 @@ class BenchmarkEvaluator:
         self, model, tokenizer, 
         benchmark_dirs=[
             "GUE/prom/prom_300_all/", 
-            # "GUE/EMP/H3K4me3/",
+            "GUE/EMP/H3K4me3/",
             "GUE/prom/prom_core_all/",
             "GUE/splice/reconstructed/",
             "GUE/tf/0/"], 
-        batch_size=512, mode="dev"):
+        batch_size=256, mode="dev"):
         """
         Initialize the evaluator with the model, tokenizer, and benchmark directories.
         
@@ -179,9 +178,9 @@ class BenchmarkEvaluator:
         Returns:
             dict: Dictionary mapping benchmark directory to its ROC-AUC score.
         """
-        print("Running probing benchmarks...")
         results = {}
         for benchmark in self.benchmark_dirs:
+            print(f"Running probing benchmarks {benchmark}...")
             auc = self.run_benchmark(benchmark)
             results[benchmark] = auc
         
