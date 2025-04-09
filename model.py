@@ -831,6 +831,7 @@ class UnifiedDNATransformer(nn.Module):
             return cls_proj
 
         elif self.model_type == 'dnabert2':
+            exit()
             # Attention mask: 1 for tokens to attend to, 0 for PAD and MASK
             attention_mask = (x != self.pad_token_id) & (x != self.mask_token_id)
             outputs = self.encoder(x, attention_mask=attention_mask)
