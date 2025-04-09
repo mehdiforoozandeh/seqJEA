@@ -5,7 +5,7 @@ import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 
-def get_embeddings(model, tokenizer, sequences, context_length, batch_size=32):
+def get_embeddings(model, tokenizer, sequences, context_length, batch_size=256):
     """
     Given a UnifiedDNATransformer model, an initialized tokenizer, and a list of DNA sequences,
     this function computes the CLS token embeddings in batches.
@@ -156,10 +156,10 @@ class BenchmarkEvaluator:
         """
         train_csv = f"{benchmark_dir}/train.csv"
         dev_csv = f"{benchmark_dir}/{self.mode}.csv"
-        print(f"Training probe on {train_csv}")
+        # print(f"Training probe on {train_csv}")
         probe = self.train_probe(train_csv)
         auc = self.evaluate_probe(probe, dev_csv)
-        print(f"Benchmark: {benchmark_dir}, AUC ROC: {auc:.4f}")
+        # print(f"Benchmark: {benchmark_dir}, AUC ROC: {auc:.4f}")
         return auc
 
     def run_all_benchmarks(self, verbose=True):
@@ -178,6 +178,7 @@ class BenchmarkEvaluator:
         Returns:
             dict: Dictionary mapping benchmark directory to its ROC-AUC score.
         """
+        print("Running probing benchmarks...")
         results = {}
         for benchmark in self.benchmark_dirs:
             auc = self.run_benchmark(benchmark)
