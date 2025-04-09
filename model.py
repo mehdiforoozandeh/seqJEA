@@ -783,7 +783,8 @@ class UnifiedDNATransformer(nn.Module):
 
         elif model_type == 'dnabert2':
             # DNABERT2 (TransformerEncoder) implementation
-            self.encoder = AutoModel.from_pretrained(model_name, trust_remote_code=True)
+            config = BertConfig.from_pretrained("zhihan1996/DNABERT-2-117M")
+            self.encoder = AutoModel.from_pretrained(model_name, trust_remote_code=True, config=config)
             hidden_size = self.encoder.config.hidden_size
             self.projection = nn.Linear(hidden_size, projection_dim)
             # Token IDs based on DNABERT-2 defaults
@@ -840,6 +841,7 @@ class UnifiedDNATransformer(nn.Module):
 if __name__ == "__main__":
     from transformers import AutoTokenizer
     import torch
+    from transformers.models.bert.configuration_bert import BertConfig
 
     # Load the tokenizer for DNABERT-2
     tokenizer = AutoTokenizer.from_pretrained("zhihan1996/DNABERT-2-117M", trust_remote_code=True)
