@@ -466,35 +466,42 @@ VOCAB_SIZE = 4096  # Default vocabulary size
 
 class UnifiedDNATransformer(nn.Module):
     """
-    A unified transformer encoder that integrates four model variants for encoding DNA sequences:
+    A unified transformer encoder integrating four transformer variants for DNA encoding:
     
-      1. DNATransformer_ALiBi: Uses ALiBi bias (Attention with Linear Biases) for positional encoding.
-      2. DNATransformer_Relative: Uses learned relative positional encodings in multi-head attention.
+      1. DNATransformer_ALiBi: Uses ALiBi bias for positional encoding.
+      2. DNATransformer_Relative: Uses learned relative positional encodings.
       3. DNATransformer_Sinusoidal: Uses fixed sinusoidal positional encodings.
       4. DNABERT2 (TransformerEncoder): Uses a pre-trained DNABERT2 model.
       
-    The choice is made during initialization by providing the argument 'model_type' with one of the values:
+    Users choose the variant via the 'model_type' parameter:
       - "alibi"
       - "relative"
       - "sinusoidal"
       - "bert2" (or "dnabert2")
-      
-    In the forward pass, regardless of the variant, only the embedding of the CLS token
-    (the first token in the sequence) is returned.
+    
+    The forward pass returns only the CLS token embedding (assumed to be the first token).
     """
     def __init__(self, model_type="alibi", **kwargs):
         """
-        Initialize the unified DNA transformer.
+        Initialize the unified model.
         
         Args:
             model_type (str): One of "alibi", "relative", "sinusoidal", or "bert2" (or "dnabert2")
-                (not case-sensitive) indicating which transformer variant to use.
-            **kwargs: Additional parameters specific to the variant (e.g.,
-                      vocab_size, embed_dim, num_layers, num_heads, etc.).
+                              (not case-sensitive) indicating which variant to use.
+            **kwargs: Additional keyword arguments used by the underlying model.
+                      Note: For variants other than DNABERT2, extra keys such as "model_name",
+                            "hidden_size", and "context_length" are removed.
         """
         super(UnifiedDNATransformer, self).__init__()
         self.model_type = model_type.lower()
         
+        # For non-DNABERT2 variants, remove keys that are not needed.
+        if self.model_type in ["alibi", "relative", "sinusoidal"]:
+            kwargs.pop("model_name", None)
+            kwargs.pop("hidden_size", None)
+            kwargs.pop("context_length", None)
+        
+        # Instantiate the corresponding model variant.
         if self.model_type == "alibi":
             self.model = self.DNATransformer_ALiBi(**kwargs)
         elif self.model_type == "relative":
@@ -508,16 +515,17 @@ class UnifiedDNATransformer(nn.Module):
     
     def forward(self, x):
         """
-        Forward pass that returns the embedding for the CLS token.
+        Forward pass that extracts and returns the CLS token embedding.
         
         Args:
             x (torch.Tensor): Input tensor of token IDs with shape [batch_size, seq_len].
-        
+            
         Returns:
-            torch.Tensor: Embedding for the CLS token (first token in the sequence).
+            torch.Tensor: The CLS token embedding.
         """
         out = self.model(x)
-        # If the underlying model returns a tuple, we assume the first element is the CLS embedding.
+        # If the underlying model returns a tuple (CLS token, pooled token, etc.),
+        # return only the first element (assumed to be the CLS embedding).
         if isinstance(out, tuple):
             return out[0]
         return out
@@ -527,7 +535,7 @@ class UnifiedDNATransformer(nn.Module):
     def get_alibi_slopes(n):
         """
         Compute ALiBi slopes for n attention heads.
-        Here each head i is assigned a slope: 1 / (2^(i+1)).
+        Uses a simplified formula: slope_i = 1 / (2^(i+1)).
         """
         return torch.tensor([1 / (2 ** (i + 1)) for i in range(n)])
     
@@ -535,8 +543,7 @@ class UnifiedDNATransformer(nn.Module):
     def get_sinusoid_encoding_table(n_position, d_hid):
         """
         Generate a sinusoidal positional encoding table with shape [n_position, d_hid].
-        
-        Based on the formulas provided in "Attention Is All You Need".
+        Based on formulas from "Attention Is All You Need".
         """
         def get_angle(pos, i):
             return pos / (10000 ** (2 * (i // 2) / d_hid))
@@ -545,16 +552,15 @@ class UnifiedDNATransformer(nn.Module):
         for pos in range(n_position):
             for i in range(d_hid):
                 table[pos, i] = get_angle(pos, i)
-        table[:, 0::2] = torch.sin(table[:, 0::2])  # apply sin to even indices
-        table[:, 1::2] = torch.cos(table[:, 1::2])  # apply cos to odd indices
+        table[:, 0::2] = torch.sin(table[:, 0::2])
+        table[:, 1::2] = torch.cos(table[:, 1::2])
         return table
 
     # --------------------- DNATransformer_ALiBi ---------------------
     class ALiBiMultiheadAttention(nn.Module):
         """
-        Multi-head attention module that incorporates ALiBi bias.
-        Instead of learned positional embeddings, a fixed linear bias (based on the relative distance
-        between tokens) is added to the attention scores.
+        Multi-head attention module incorporating ALiBi bias.
+        A fixed linear bias (based on relative distances) is added to attention scores.
         """
         def __init__(self, embed_dim, num_heads, dropout=0.0, max_len=512):
             super().__init__()
@@ -564,44 +570,39 @@ class UnifiedDNATransformer(nn.Module):
             self.d_k = embed_dim // num_heads
             self.dropout = dropout
             self.max_len = max_len
-            
-            # Linear projections for queries (Q), keys (K), values (V), and final output.
+
+            # Linear projections for Q, K, V and output.
             self.W_q = nn.Linear(embed_dim, embed_dim)
             self.W_k = nn.Linear(embed_dim, embed_dim)
             self.W_v = nn.Linear(embed_dim, embed_dim)
             self.W_o = nn.Linear(embed_dim, embed_dim)
             
-            # Precompute ALiBi slopes and register as a non-learnable buffer.
+            # Precompute and register ALiBi slopes.
             slopes = UnifiedDNATransformer.get_alibi_slopes(num_heads)
             self.register_buffer("alibi_slopes", slopes.unsqueeze(1).unsqueeze(1))
         
         def forward(self, x, key_padding_mask=None):
             """
             Args:
-                x (torch.Tensor): Input tensor of shape [batch, seq_len, embed_dim].
-                key_padding_mask (torch.Tensor): Boolean mask of shape [batch, seq_len] with True for positions to ignore.
+                x (torch.Tensor): [batch, seq_len, embed_dim].
+                key_padding_mask (torch.Tensor): [batch, seq_len] where True indicates positions to ignore.
             Returns:
-                torch.Tensor: Output tensor of shape [batch, seq_len, embed_dim].
+                torch.Tensor: [batch, seq_len, embed_dim] output.
             """
             bsz, seq_len, _ = x.size()
-            # Linear projections
             Q = self.W_q(x).view(bsz, seq_len, self.num_heads, self.d_k).transpose(1, 2)
             K = self.W_k(x).view(bsz, seq_len, self.num_heads, self.d_k).transpose(1, 2)
             V = self.W_v(x).view(bsz, seq_len, self.num_heads, self.d_k).transpose(1, 2)
             
-            # Calculate content-based attention scores.
-            scores = torch.matmul(Q, K.transpose(-2, -1))  # shape: [B, H, L, L]
-            
-            # Compute relative positions and create the ALiBi bias.
+            scores = torch.matmul(Q, K.transpose(-2, -1))
             positions = torch.arange(seq_len, device=x.device)
-            rel_pos = positions.unsqueeze(1) - positions.unsqueeze(0)  # relative positions matrix [L, L]
-            alibi_bias = -self.alibi_slopes * rel_pos.to(x.dtype)  # each head gets a different bias
+            rel_pos = positions.unsqueeze(1) - positions.unsqueeze(0)
+            alibi_bias = -self.alibi_slopes * rel_pos.to(x.dtype)
             alibi_bias = alibi_bias.unsqueeze(0).expand(bsz, -1, -1, -1)
             
-            # Scale scores, add bias, and apply the key padding mask.
             scores = scores / math.sqrt(self.d_k) + alibi_bias
             if key_padding_mask is not None:
-                mask = key_padding_mask.unsqueeze(1).unsqueeze(2)  # shape: [B, 1, 1, L]
+                mask = key_padding_mask.unsqueeze(1).unsqueeze(2)
                 scores = scores.masked_fill(mask, float('-inf'))
             
             attn = F.softmax(scores, dim=-1)
@@ -612,7 +613,7 @@ class UnifiedDNATransformer(nn.Module):
     
     class ALiBiTransformerEncoderLayer(nn.Module):
         """
-        A Transformer encoder layer that uses ALiBi-based multihead attention.
+        Transformer encoder layer using ALiBi-based attention.
         """
         def __init__(self, embed_dim, num_heads, dim_feedforward, dropout=0.1, max_len=512):
             super().__init__()
@@ -628,34 +629,28 @@ class UnifiedDNATransformer(nn.Module):
             self.dropout2 = nn.Dropout(dropout)
         
         def forward(self, src, src_key_padding_mask=None):
-            # Self-attention sub-layer with residual connection and normalization.
             src2 = self.self_attn(src, key_padding_mask=src_key_padding_mask)
             src = self.norm1(src + self.dropout1(src2))
-            # Feed-forward sub-layer with residual connection and normalization.
             src2 = self.linear2(self.dropout(F.gelu(self.linear1(src))))
             src = self.norm2(src + self.dropout2(src2))
             return src
     
     class DNATransformer_ALiBi(nn.Module):
         """
-        Transformer encoder for DNA using ALiBi positional encoding.
-        Ignores [PAD], [MASK], or similar tokens via key padding masking.
-        Only the CLS token (first token) is extracted for the final output.
+        Transformer encoder for DNA using ALiBi encoding.
+        Only the CLS token (first token) is used for the output.
         """
         def __init__(self, vocab_size=VOCAB_SIZE, embed_dim=256, num_layers=4, num_heads=4,
                      dim_feedforward=512, max_len=512, projection_dim=256, dropout=0.1):
             super().__init__()
             self.embed_dim = embed_dim
-            # Token embedding.
             self.embedding = nn.Embedding(vocab_size, embed_dim)
             self.max_len = max_len
-            # Stack multiple encoder layers.
             self.layers = nn.ModuleList([
                 UnifiedDNATransformer.ALiBiTransformerEncoderLayer(
                     embed_dim, num_heads, dim_feedforward, dropout, max_len
                 ) for _ in range(num_layers)
             ])
-            # Projection head (MLP) to produce the final embedding.
             self.projection_head = nn.Sequential(
                 nn.Linear(embed_dim, embed_dim),
                 nn.GELU(),
@@ -664,19 +659,11 @@ class UnifiedDNATransformer(nn.Module):
             self.dropout = nn.Dropout(dropout)
         
         def forward(self, x):
-            """
-            Args:
-                x (torch.Tensor): [batch_size, seq_len] of token IDs.
-            Returns:
-                torch.Tensor: Projected CLS token embedding.
-            """
             bsz, seq_len = x.shape
-            # Create a key padding mask (e.g., where token IDs indicate padding or mask).
             key_padding_mask = (x == 3) | (x == 4) | (x == 2)
             x = self.embedding(x)
             for layer in self.layers:
                 x = layer(x, src_key_padding_mask=key_padding_mask)
-            # Extract the CLS token (first token).
             cls_output = x[:, 0, :]
             cls_output = self.dropout(cls_output)
             cls_proj = self.projection_head(cls_output)
@@ -685,7 +672,7 @@ class UnifiedDNATransformer(nn.Module):
     # --------------------- DNATransformer_Relative ---------------------
     class RelativeMultiheadAttention(nn.Module):
         """
-        Multi-head attention module that uses learned relative positional embeddings.
+        Multi-head attention using learned relative positional embeddings.
         """
         def __init__(self, embed_dim, num_heads, dropout=0.0, max_len=512):
             super().__init__()
@@ -696,36 +683,24 @@ class UnifiedDNATransformer(nn.Module):
             assert embed_dim % num_heads == 0, "embed_dim must be divisible by num_heads"
             self.d_k = embed_dim // num_heads
             
-            # Linear projection layers.
             self.W_q = nn.Linear(embed_dim, embed_dim)
             self.W_k = nn.Linear(embed_dim, embed_dim)
             self.W_v = nn.Linear(embed_dim, embed_dim)
             self.W_o = nn.Linear(embed_dim, embed_dim)
-            # Learnable relative positional embeddings for positions in the range [-max_len+1, max_len-1].
             self.rel_pos_embedding = nn.Embedding(2 * max_len - 1, self.d_k)
         
         def forward(self, x, key_padding_mask=None):
-            """
-            Args:
-                x (torch.Tensor): [batch, seq_len, embed_dim]
-                key_padding_mask (torch.Tensor): [batch, seq_len]
-            Returns:
-                torch.Tensor: [batch, seq_len, embed_dim]
-            """
             bsz, seq_len, _ = x.size()
             Q = self.W_q(x).view(bsz, seq_len, self.num_heads, self.d_k).transpose(1, 2)
             K = self.W_k(x).view(bsz, seq_len, self.num_heads, self.d_k).transpose(1, 2)
             V = self.W_v(x).view(bsz, seq_len, self.num_heads, self.d_k).transpose(1, 2)
-            
-            # Content-based attention scores.
             scores_content = torch.matmul(Q, K.transpose(-2, -1))
             
-            # Build relative position indices.
             pos_ids = torch.arange(seq_len, device=x.device)
             rel_pos = pos_ids.unsqueeze(1) - pos_ids.unsqueeze(0)
-            rel_pos += self.max_len - 1  # shift indices to be >=0
+            rel_pos += self.max_len - 1
             rel_pos = rel_pos.clamp(0, 2 * self.max_len - 2)
-            rel_emb = self.rel_pos_embedding(rel_pos)  # [seq_len, seq_len, d_k]
+            rel_emb = self.rel_pos_embedding(rel_pos)
             scores_pos = torch.einsum('bhid,ijd->bhij', Q, rel_emb)
             
             scores = (scores_content + scores_pos) / math.sqrt(self.d_k)
@@ -740,7 +715,7 @@ class UnifiedDNATransformer(nn.Module):
     
     class RelativeTransformerEncoderLayer(nn.Module):
         """
-        Transformer encoder layer with relative positional attention.
+        Transformer encoder layer using relative positional attention.
         """
         def __init__(self, embed_dim, num_heads, dim_feedforward, dropout=0.1, max_len=512):
             super().__init__()
@@ -765,7 +740,7 @@ class UnifiedDNATransformer(nn.Module):
     class DNATransformer_Relative(nn.Module):
         """
         Transformer encoder for DNA using relative positional encodings.
-        Only the CLS token embedding is extracted and returned.
+        Only the CLS token embedding is returned.
         """
         def __init__(self, vocab_size=VOCAB_SIZE, embed_dim=256, num_layers=4, num_heads=4,
                      dim_feedforward=512, max_len=512, projection_dim=256, dropout=0.1):
@@ -786,12 +761,6 @@ class UnifiedDNATransformer(nn.Module):
             self.dropout = nn.Dropout(dropout)
         
         def forward(self, x):
-            """
-            Args:
-                x (torch.Tensor): [batch_size, seq_len] token IDs.
-            Returns:
-                torch.Tensor: Projected CLS token embedding.
-            """
             bsz, seq_len = x.shape
             key_padding_mask = (x == 3) | (x == 4)
             x = self.embedding(x)
@@ -805,8 +774,8 @@ class UnifiedDNATransformer(nn.Module):
     # --------------------- DNATransformer_Sinusoidal ---------------------
     class DNATransformer_Sinusoidal(nn.Module):
         """
-        Transformer encoder for DNA that uses fixed sinusoidal positional encodings.
-        Even though the original formulation uses mean pooling, here we extract the CLS token.
+        Transformer encoder for DNA using sinusoidal positional encodings.
+        Although the original method uses mean pooling, here we extract the CLS token.
         """
         def __init__(self, vocab_size=VOCAB_SIZE, embed_dim=256, num_layers=4, num_heads=4,
                      dim_feedforward=512, max_len=512, projection_dim=256, dropout=0.1):
@@ -814,10 +783,8 @@ class UnifiedDNATransformer(nn.Module):
             self.embed_dim = embed_dim
             self.embedding = nn.Embedding(vocab_size, embed_dim)
             self.max_len = max_len
-            # Precompute sinusoidal positional encodings.
             pe = UnifiedDNATransformer.get_sinusoid_encoding_table(max_len, embed_dim)
             self.register_buffer("pos_embedding", pe)
-            # Define a Transformer encoder layer using PyTorch's built-in modules.
             encoder_layer = nn.TransformerEncoderLayer(
                 d_model=embed_dim, nhead=num_heads,
                 dim_feedforward=dim_feedforward, dropout=dropout, batch_first=True
@@ -831,19 +798,13 @@ class UnifiedDNATransformer(nn.Module):
             self.dropout = nn.Dropout(dropout)
         
         def forward(self, x):
-            """
-            Args:
-                x (torch.Tensor): [batch_size, seq_len] token IDs.
-            Returns:
-                torch.Tensor: Projected CLS token embedding.
-            """
             bsz, seq_len = x.shape
             key_padding_mask = (x == 3) | (x == 4)
             token_emb = self.embedding(x)
             pos_emb = self.pos_embedding[:seq_len, :].unsqueeze(0)
             x_emb = token_emb + pos_emb
             encoded = self.transformer(x_emb, src_key_padding_mask=key_padding_mask)
-            cls_output = encoded[:, 0, :]  # extract CLS token at position 0
+            cls_output = encoded[:, 0, :]
             cls_output = self.dropout(cls_output)
             cls_proj = self.projection_head(cls_output)
             return cls_proj
@@ -852,7 +813,7 @@ class UnifiedDNATransformer(nn.Module):
     class TransformerEncoder(nn.Module):
         """
         Transformer encoder model based on a pre-trained DNABERT2.
-        Only the CLS token (first token) embedding is extracted.
+        Only the CLS token embedding is extracted.
         """
         def __init__(self, model_name="zhihan1996/DNABERT-2-117M", hidden_size=768, context_length=512,
                      mask_token_id=4, pad_token_id=1, cls_token_id=0):
@@ -865,15 +826,9 @@ class UnifiedDNATransformer(nn.Module):
             self.cls_token_id = cls_token_id
         
         def forward(self, input_ids):
-            """
-            Args:
-                input_ids (torch.Tensor): [batch_size, seq_len] token IDs.
-            Returns:
-                torch.Tensor: Projected CLS token embedding.
-            """
             attention_mask = (input_ids != self.mask_token_id) & (input_ids != self.pad_token_id)
             outputs = self.encoder(input_ids, attention_mask=attention_mask)
-            cls_output = outputs.last_hidden_state[:, 0, :]  # CLS token output
+            cls_output = outputs.last_hidden_state[:, 0, :]
             cls_output = self.projection(cls_output)
             return cls_output
 
@@ -882,7 +837,7 @@ if __name__ == "__main__":
     # Create a dummy input tensor (batch_size=2, sequence length=10).
     dummy_input = torch.randint(0, VOCAB_SIZE, (2, 10))
     
-    # Test each variant.
+    # Iterate over each variant and test.
     for variant in ["alibi", "relative", "sinusoidal", "bert2"]:
         print(f"Testing variant: {variant}")
         model = UnifiedDNATransformer(
@@ -895,7 +850,7 @@ if __name__ == "__main__":
             max_len=512,
             projection_dim=256,
             dropout=0.1,
-            model_name="zhihan1996/DNABERT-2-117M",  # used for TransformerEncoder
+            model_name="zhihan1996/DNABERT-2-117M",  # Only used for the DNABERT2 variant.
             hidden_size=768,
             context_length=512
         )
