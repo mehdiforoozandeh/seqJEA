@@ -192,5 +192,6 @@ class BenchmarkEvaluator:
             print("-" * (len(header) + 10))
             for bench, auc in results.items():
                 print(f"{bench:<50} {auc:<10.4f}")
+            print("-" * (len(header) + 10))
         return results
 

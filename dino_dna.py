@@ -232,6 +232,7 @@ class DINO:
                     self.optimizer.zero_grad()
                     # Move global view (input_ids) to the student device.
                     global_view = batch["input_ids"].to(self.device_student)
+                    print(global_view)
                     
                     # Compute teacher output on teacher device then move to student device.
                     with torch.no_grad():
@@ -323,7 +324,8 @@ class DINO:
             print(f"Epoch {epoch+1}/{self.num_epochs}, Loss: {avg_loss:.3}, T_Std: {avg_teacher_std:.3f}, "
                   f"T_Ent: {avg_teacher_entropy:.3f}, S_Ent: {avg_student_entropy:.3f}")
             
-            if (epoch+1)%20==0:
+            # if epoch == 0 or (epoch+1)%150==0:
+            if epoch == 0 or (epoch+1)%150==0:
                 self.benchmark.model = self.model
                 self.benchmark.run_all_benchmarks()
 
@@ -344,11 +346,11 @@ if __name__ == "__main__":
     max_len_seq = 10000  # maximum sequence length for dataset
     context_length = 512  # model's context length (max_len for transformer)
     dropout = 0.1
-    num_epochs = 100
+    num_epochs = 1500
     n_subseq = 2
     m_masked = 2
     fraction = 0.5
-    mask_prob = 0.5
+    mask_prob = 0.3
     l = 0.99
     m = 0.995
     tps = 0.5
