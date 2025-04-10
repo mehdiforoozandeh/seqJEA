@@ -251,7 +251,7 @@ class DINO:
                     # Combine views: global + subsequence + masked
                     student_views = [batch[k] for k in batch.keys()]
                     n_views = len(student_views)
-                    merged_views = torch.cat(student_views, dim=0)  # [n_views * batch_size, context_length]
+                    merged_views = torch.cat(student_views, dim=0).to(self.device_student)  # [n_views * batch_size, context_length]
 
                     # Student forward pass in one call
                     merged_student_outputs = self.model(merged_views)  # [n_views * batch_size, projection_dim]
