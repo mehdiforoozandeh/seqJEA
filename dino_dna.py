@@ -331,7 +331,7 @@ class DINO:
     #             self.benchmark.model = self.model
     #             self.benchmark.run_all_benchmarks()
 
-    def train_dino(self, accumulation_steps=4):
+    def train_dino(self, accumulation_steps=10):
         """
         Train the DINO-DNA framework with gradient accumulation to handle small batch sizes.
         
@@ -495,7 +495,7 @@ if __name__ == "__main__":
     m_masked = 2
     fraction = 0.5
     mask_prob = 0.3
-    l = 0.99
+    l = 0.995
     m = 0.995
     tps = 0.5
     tpt = 0.05  
