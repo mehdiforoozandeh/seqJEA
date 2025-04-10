@@ -79,84 +79,6 @@ class DINO:
         self.center = torch.zeros(self.model.projection_head[-1].out_features, device=device_student)
         self.benchmark = BenchmarkEvaluator(self.model, self.tokenizer)
 
-    # def pad_to_context_length(self, sequences, context_length):
-    #     """
-    #     Pad each sequence (view) to a fixed context length.
-        
-    #     Args:
-    #         sequences (list[Tensor]): List of tensors each of shape [batch, seq_len].
-    #         context_length (int): Desired final sequence length.
-        
-    #     Returns:
-    #         list[Tensor]: List with each tensor padded (or truncated) to context_length.
-    #     """
-    #     padded_sequences = []
-    #     for seq in sequences:
-    #         if seq.size(1) < context_length:
-    #             padding = torch.full((seq.size(0), context_length - seq.size(1)), 
-    #                                  self.pad_token_id, device=seq.device)
-    #             padded_seq = torch.cat([seq, padding], dim=1)
-    #         else:
-    #             padded_seq = seq[:, :context_length]
-    #         padded_sequences.append(padded_seq)
-    #     return padded_sequences
-
-    # def generate_subsequence_views(self, global_view):
-    #     """
-    #     Generate local subsequence views from the global view.
-    #     Each view is a random contiguous subsequence (of length = fraction * seq_len)
-    #     padded to the network's maximum context length.
-        
-    #     Args:
-    #         global_view (Tensor): [batch, seq_len] tensor (global view).
-        
-    #     Returns:
-    #         list[Tensor]: List of subsequence view tensors.
-    #     """
-    #     views = []
-    #     seq_len = global_view.size(1)
-    #     subseq_len = int(seq_len * self.fraction)
-    #     for _ in range(self.n_subseq):
-    #         start = torch.randint(0, seq_len - subseq_len + 1, (1,)).item()
-    #         subseq = global_view[:, start:start+subseq_len]
-    #         views.append(subseq)
-    #     return self.pad_to_context_length(views, self.model.max_len)
-
-    # def generate_masked_views(self, global_view):
-    #     """
-    #     Generate masked views by randomly replacing tokens with mask_token_id.
-    #     The CLS token (assumed at index 0) remains unmasked.
-        
-    #     Args:
-    #         global_view (Tensor): [batch, seq_len] tensor (global view).
-        
-    #     Returns:
-    #         list[Tensor]: List of masked view tensors.
-    #     """
-    #     views = []
-    #     for _ in range(self.m_masked):
-    #         masked_view = global_view.clone()
-    #         mask_indices = torch.rand(global_view.size(), device=global_view.device) < self.mask_prob
-    #         mask_indices[:, 0] = False  # preserve CLS token
-    #         masked_view[mask_indices] = self.mask_token_id
-    #         views.append(masked_view)
-    #     return self.pad_to_context_length(views, self.model.max_len)
-
-    # def compute_normalized_entropy(self, outputs):
-    #     """
-    #     Compute the normalized entropy for a given output distribution.
-        
-    #     Args:
-    #         outputs (Tensor): Logits or projections of shape [batch, dim].
-        
-    #     Returns:
-    #         float: Normalized entropy (entropy divided by the maximum entropy).
-    #     """
-    #     probs = F.softmax(outputs, dim=1)
-    #     entropy = - (probs * torch.log(probs + 1e-7)).sum(dim=1).mean().item()
-    #     max_entropy = math.log(outputs.size(1))
-    #     return entropy / max_entropy
-
     def update_teacher(self):
         """
         Update teacher network parameters using exponential moving average (EMA)
@@ -339,12 +261,12 @@ class DINO:
                 f"T_Ent: {avg_teacher_entropy:.3f}, S_Ent: {avg_student_entropy:.3f}")
 
             # Run benchmarks every 150 epochs
-            if (epoch + 1) % 150 == 0:
+            if (epoch + 1) % 100 == 0:
                 self.benchmark.model = self.model
-                self.benchmark.run_all_benchmarks()
+                results =self.benchmark.run_all_benchmarks()
                 
 ####################################
-# Example Usage
+# Usage
 ####################################
 if __name__ == "__main__":
     # Hyperparameters
@@ -358,7 +280,7 @@ if __name__ == "__main__":
     max_len_seq = 8192  # maximum sequence length for dataset
     context_length = 1024  # model's context length (max_len for transformer)
     dropout = 0.05
-    num_epochs = 1500
+    num_epochs = 1000
     fractions = [0.25, 0.5, 0.75]
     l = 0.995
     m = 0.995
@@ -408,7 +330,7 @@ if __name__ == "__main__":
     teacher_model.load_state_dict(model.state_dict())
 
     # Optimizer for student model.
-    optimizer = optim.SGD(model.parameters(), lr=1e-3)
+    optimizer = optim.SGD(model.parameters(), lr=2e-4)
 
     dino = DINO(model, teacher_model, dataloader, optimizer, num_epochs, 
         tokenizer, l, m, tps, tpt, device_student, device_teacher)

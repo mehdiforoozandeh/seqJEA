@@ -68,11 +68,11 @@ class BenchmarkEvaluator:
     def __init__(
         self, model, tokenizer, 
         benchmark_dirs=[
-            "GUE/prom/prom_300_tata/", 
+            "GUE/prom/prom_300_all/", 
+            "GUE/prom/prom_core_all/",
             "GUE/EMP/H4/",
             "GUE/EMP/H3/",
-            "GUE/prom/prom_core_tata/",
-            # "GUE/splice/reconstructed/",
+            "GUE/splice/reconstructed/",
             "GUE/tf/4/"], 
         batch_size=64, mode="dev"):
         """
