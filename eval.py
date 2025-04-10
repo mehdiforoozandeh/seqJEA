@@ -5,7 +5,7 @@ import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 
-def get_embeddings(model, tokenizer, sequences, context_length, batch_size=256):
+def get_embeddings(model, tokenizer, sequences, context_length, batch_size=64):
     """
     Given a UnifiedDNATransformer model, an initialized tokenizer, and a list of DNA sequences,
     this function computes the CLS token embeddings in batches.
@@ -74,7 +74,7 @@ class BenchmarkEvaluator:
             "GUE/prom/prom_core_tata/",
             # "GUE/splice/reconstructed/",
             "GUE/tf/4/"], 
-        batch_size=256, mode="dev"):
+        batch_size=64, mode="dev"):
         """
         Initialize the evaluator with the model, tokenizer, and benchmark directories.
         
