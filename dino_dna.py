@@ -75,8 +75,14 @@ class DINO:
         self.device_student = device_student
         self.device_teacher = device_teacher
         
-        # Initialize center vector from the output (projection) dimension on student device.
-        self.center = torch.zeros(self.model.projection_head[-1].out_features, device=device_student)
+        # Here, if you're using DataParallel, extract the underlying module.
+        if isinstance(self.model, nn.DataParallel):
+            base_model = self.model.module
+        else:
+            base_model = self.model
+        
+        # Use the base_model's attribute here.
+        self.center = torch.zeros(base_model.projection_head[-1].out_features, device=device_student)
 
         self.benchmark = BenchmarkEvaluator(self.model, self.tokenizer)
 
