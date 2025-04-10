@@ -91,12 +91,17 @@ class DNADataset(torch.utils.data.Dataset):
 
             views = {}
             for i, seq in enumerate(seqs):
-                views[f"input_ids_{i}"] = tokenizer(
+                tokenized = tokenizer(
                     seq.upper(),
                     return_tensors="pt",
                     padding="max_length",
                     max_length=self.context_length,
                     truncation=True)
+                
+                if i==0:
+                    views["global"] = tokenized["input_ids"].squeeze(0)
+                else:
+                    views[f"local_{i}"] = tokenized["input_ids"].squeeze(0)
 
             return views
         return tokenize_fn
