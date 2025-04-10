@@ -84,6 +84,8 @@ class DNADataset(torch.utils.data.Dataset):
         """Load DNABERT-2 tokenizer, returning input_ids and attention_mask."""
         tokenizer = AutoTokenizer.from_pretrained("zhihan1996/DNABERT-2-117M", trust_remote_code=True)
         def tokenize_fn(sequence):    
+            print(sequence)
+            exit()
             seqs = [sequence]
             seqs.append(self.reverse_complement(sequence))
             for frac in self.subset_fracs:
