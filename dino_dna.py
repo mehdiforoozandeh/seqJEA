@@ -233,6 +233,8 @@ class DINO:
             pbar = tqdm(self.dataloader, desc=f"Epoch {epoch+1}/{self.num_epochs}", leave=False)
             for batch in pbar:
                 try:
+                    print(batch)
+                    exit()
                     # Do not clear gradients immediately; accumulate them
                     global_view = batch["input_ids_0"].to(self.device_student)
 
