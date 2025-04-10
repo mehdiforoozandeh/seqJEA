@@ -340,7 +340,7 @@ if __name__ == "__main__":
     # Hyperparameters
 
     model_type = "alibi"
-    batch_size = 3
+    batch_size = 2
     embed_dim = 384
     num_layers = 6
     num_heads = 6
@@ -351,7 +351,7 @@ if __name__ == "__main__":
     dropout = 0.1
     num_epochs = 1500
     n_subseq = 2
-    m_masked = 2
+    m_masked = 1
     fraction = 0.5
     mask_prob = 0.3
     l = 0.99
