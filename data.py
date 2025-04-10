@@ -11,7 +11,8 @@ class DNADataset(torch.utils.data.Dataset):
         dataset_size=10000,
         min_length=200,
         max_length=512, 
-        context_length=500):
+        context_length=500, 
+        subset_fracs=[0.25, 0.5, 0.75]):
         """
         Initialize the DNADataset.
 
@@ -37,6 +38,7 @@ class DNADataset(torch.utils.data.Dataset):
         self.min_length = min_length
         self.max_length = max_length
         self.context_length = context_length
+        self.subset_fracs = subset_fracs
 
         # Load blacklist regions into IntervalTrees
         self.blacklist = self.load_blacklist(blacklist_file)
@@ -81,16 +83,22 @@ class DNADataset(torch.utils.data.Dataset):
     def load_dnabert_tokenizer(self):
         """Load DNABERT-2 tokenizer, returning input_ids and attention_mask."""
         tokenizer = AutoTokenizer.from_pretrained("zhihan1996/DNABERT-2-117M", trust_remote_code=True)
-        def tokenize_fn(sequence):
-            tokenized = tokenizer(sequence.upper(),  # Ensure uppercase for consistency
-                                  return_tensors="pt",
-                                  padding="max_length",
-                                  max_length=self.context_length,
-                                  truncation=True)
-            return {
-                "input_ids": tokenized["input_ids"].squeeze(0),
-                "attention_mask": tokenized["attention_mask"].squeeze(0)
-            }
+        def tokenize_fn(sequence):    
+            seqs = [sequence]
+            seqs.append(self.reverse_complement(sequence))
+            for frac in self.subset_fracs:
+                seqs.append(self.random_subsequence(sequence, frac))
+
+            views = {}
+            for i, seq in enumerate(seqs):
+                views[f"input_ids_{i}"] = tokenizer(
+                    seq.upper(),
+                    return_tensors="pt",
+                    padding="max_length",
+                    max_length=self.context_length,
+                    truncation=True)
+
+            return views
         return tokenize_fn
 
     def is_region_allowed(self, chrom, start, end):
@@ -116,6 +124,19 @@ class DNADataset(torch.utils.data.Dataset):
             return None
         sequence = self.fasta.fetch(chrom, start, end).upper()  # Ensure uppercase
         return sequence
+
+    def reverse_complement(dna):
+        complement_table = str.maketrans("ACGTacgt", "TGCAtgca")
+        return dna.translate(complement_table)[::-1]
+
+    def random_subsequence(dna, fraction):
+        L = len(dna)
+        subseq_len = max(1, int(L * fraction))
+        if L == subseq_len:
+            return dna  # If fraction == 1 or L is too small, return the entire sequence.
+
+        start = random.randint(0, L - subseq_len)
+        return dna[start:start + subseq_len]
 
     def __len__(self):
         """Return the dataset size."""
