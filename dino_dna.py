@@ -12,7 +12,7 @@ import torch.nn.functional as F
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:256"
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
-device_teacher = device_student = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device_teacher = device_student = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class DINO:
     """
@@ -342,7 +342,7 @@ if __name__ == "__main__":
     num_heads = 6
     dim_feedforward = 2 * embed_dim
     projection_dim = embed_dim
-    max_len_seq = 3000  # maximum sequence length for dataset
+    max_len_seq = 1000  # maximum sequence length for dataset
     context_length = 1024  # model's context length (max_len for transformer)
     dropout = 0.1
     num_epochs = 1500
@@ -381,6 +381,8 @@ if __name__ == "__main__":
         dropout=dropout
     ).to(device_student)
 
+    model = nn.DataParallel(model)
+
     teacher_model = UnifiedDNATransformer(
         model_type, 
         vocab_size=VOCAB_SIZE, 
@@ -392,6 +394,8 @@ if __name__ == "__main__":
         projection_dim=embed_dim, 
         dropout=dropout
     ).to(device_teacher)
+
+    teacher_model = nn.DataParallel(teacher_model)
 
     # Initialize teacher with student's weights.
     teacher_model.load_state_dict(model.state_dict())
