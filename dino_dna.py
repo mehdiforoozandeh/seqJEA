@@ -12,7 +12,12 @@ import torch.nn.functional as F
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:256"
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
-device_teacher = device_student = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+if torch.cuda.device_count() >= 2:
+    device_teacher = torch.device("cuda:0")
+    device_student = torch.device("cuda:1")
+else:
+    device_teacher = device_student = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 class DINO:
     """
@@ -75,15 +80,8 @@ class DINO:
         self.device_student = device_student
         self.device_teacher = device_teacher
         
-        # Here, if you're using DataParallel, extract the underlying module.
-        if isinstance(self.model, nn.DataParallel):
-            base_model = self.model.module
-        else:
-            base_model = self.model
-        
         # Use the base_model's attribute here.
-        self.center = torch.zeros(base_model.projection_head[-1].out_features, device=device_student)
-
+        self.center = torch.zeros(self.model.projection_head[-1].out_features, device=device_student)
         self.benchmark = BenchmarkEvaluator(self.model, self.tokenizer)
 
     def pad_to_context_length(self, sequences, context_length):
@@ -387,8 +385,6 @@ if __name__ == "__main__":
         dropout=dropout
     ).to(device_student)
 
-    model = nn.DataParallel(model)
-
     teacher_model = UnifiedDNATransformer(
         model_type, 
         vocab_size=VOCAB_SIZE, 
@@ -400,8 +396,6 @@ if __name__ == "__main__":
         projection_dim=embed_dim, 
         dropout=dropout
     ).to(device_teacher)
-
-    teacher_model = nn.DataParallel(teacher_model)
 
     # Initialize teacher with student's weights.
     teacher_model.load_state_dict(model.state_dict())
