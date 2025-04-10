@@ -125,11 +125,11 @@ class DNADataset(torch.utils.data.Dataset):
         sequence = self.fasta.fetch(chrom, start, end).upper()  # Ensure uppercase
         return sequence
 
-    def reverse_complement(dna):
+    def reverse_complement(self, dna):
         complement_table = str.maketrans("ACGTacgt", "TGCAtgca")
         return dna.translate(complement_table)[::-1]
 
-    def random_subsequence(dna, fraction):
+    def random_subsequence(self, dna, fraction):
         L = len(dna)
         subseq_len = max(1, int(L * fraction))
         if L == subseq_len:
