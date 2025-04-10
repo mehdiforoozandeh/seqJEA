@@ -18,7 +18,6 @@ if torch.cuda.device_count() >= 2:
 else:
     device_teacher = device_student = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-
 class DINO:
     """
     DINO class for training a student and teacher network in a DINO-DNA framework.
@@ -332,13 +331,11 @@ class DINO:
                 self.benchmark.model = self.model
                 self.benchmark.run_all_benchmarks()
 
-
 ####################################
 # Example Usage
 ####################################
 if __name__ == "__main__":
     # Hyperparameters
-
     model_type = "alibi"
     batch_size = 2
     embed_dim = 384
@@ -346,9 +343,9 @@ if __name__ == "__main__":
     num_heads = 6
     dim_feedforward = 2 * embed_dim
     projection_dim = embed_dim
-    max_len_seq = 1000  # maximum sequence length for dataset
+    max_len_seq = 8192  # maximum sequence length for dataset
     context_length = 1024  # model's context length (max_len for transformer)
-    dropout = 0.1
+    dropout = 0.05
     num_epochs = 1500
     n_subseq = 2
     m_masked = 2
