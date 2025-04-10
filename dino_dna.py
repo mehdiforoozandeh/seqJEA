@@ -351,7 +351,7 @@ if __name__ == "__main__":
     dropout = 0.1
     num_epochs = 1500
     n_subseq = 2
-    m_masked = 1
+    m_masked = 2
     fraction = 0.5
     mask_prob = 0.3
     l = 0.99
