@@ -275,8 +275,8 @@ class DINO:
                     if torch.isnan(loss):
                         self.optimizer.zero_grad()
                         self.clean_up_intermediates(
-                            global_view, subseq_views, masked_views, student_views,
-                            merged_views, merged_student_outputs, student_outputs, teacher_output, loss)
+                            global_view,  student_views, merged_views, merged_student_outputs, 
+                            student_outputs, teacher_output, loss)
                         continue
 
                     # Scale loss to simulate larger batch size and accumulate gradients
@@ -308,8 +308,9 @@ class DINO:
 
                     # Clean up intermediates after each batch
                     self.clean_up_intermediates(
-                        global_view, subseq_views, masked_views, student_views,
-                        merged_views, merged_student_outputs, student_outputs, teacher_output, loss)
+                        global_view, student_views, merged_views, 
+                        merged_student_outputs, student_outputs,
+                         teacher_output, loss)
 
                 except RuntimeError as e:
                     if "out of memory" in str(e):
