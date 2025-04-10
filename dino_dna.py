@@ -35,8 +35,7 @@ class DINO:
     The dino_loss() method is a placeholder and should be replaced with your actual loss.
     """
     def __init__(self, model, teacher_model, dataloader, optimizer, num_epochs, 
-                 n_subseq, m_masked, fraction, mask_prob, tokenizer,
-                 l, m, tps, tpt, device_student, device_teacher):
+                tokenizer, l, m, tps, tpt, device_student, device_teacher):
         """
         Initialize the DINO training framework.
         
