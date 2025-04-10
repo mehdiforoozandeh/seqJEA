@@ -63,10 +63,7 @@ class DINO:
         self.dataloader = dataloader
         self.optimizer = optimizer
         self.num_epochs = num_epochs
-        self.n_subseq = n_subseq
-        self.m_masked = m_masked
-        self.fraction = fraction
-        self.mask_prob = mask_prob
+
         self.tokenizer = tokenizer
         self.mask_token_id = tokenizer.mask_token_id
         self.pad_token_id = tokenizer.pad_token_id
@@ -414,7 +411,6 @@ if __name__ == "__main__":
     optimizer = optim.SGD(model.parameters(), lr=1e-3)
 
     dino = DINO(model, teacher_model, dataloader, optimizer, num_epochs, 
-        n_subseq, m_masked, fraction, mask_prob, tokenizer,
-        l, m, tps, tpt, device_student, device_teacher)
+        tokenizer, l, m, tps, tpt, device_student, device_teacher)
 
     dino.train_dino()
