@@ -340,7 +340,7 @@ if __name__ == "__main__":
     # Hyperparameters
 
     model_type = "alibi"
-    batch_size = 2
+    batch_size = 5
     embed_dim = 384
     num_layers = 6
     num_heads = 6
