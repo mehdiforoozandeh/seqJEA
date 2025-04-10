@@ -233,10 +233,8 @@ class DINO:
             pbar = tqdm(self.dataloader, desc=f"Epoch {epoch+1}/{self.num_epochs}", leave=False)
             for batch in pbar:
                 try:
-                    print(batch)
-                    exit()
                     # Do not clear gradients immediately; accumulate them
-                    global_view = batch["input_ids_0"].to(self.device_student)
+                    global_view = batch["input_ids_0"]["input_ids"].to(self.device_student)
 
                     # Compute teacher output on teacher device then move to student device
                     with torch.no_grad():
@@ -251,7 +249,7 @@ class DINO:
                     normalized_teacher_entropy = teacher_entropy / max_entropy
 
                     # Combine views: global + subsequence + masked
-                    student_views = [batch[k] for k in batch.keys()]
+                    student_views = [batch[k]["input_ids"] for k in batch.keys()]
                     n_views = len(student_views)
                     merged_views = torch.cat(student_views, dim=0)  # [n_views * batch_size, context_length]
 
