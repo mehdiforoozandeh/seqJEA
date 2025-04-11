@@ -151,6 +151,7 @@ class DINO:
             total_student_entropy = 0.0
             batch_count = 0
             step_count = 0  # Counter for gradient accumulation steps
+            epoch_kl_div = 0.0  # Accumulate batch average KL divergence for the epoch
 
             pbar = tqdm(self.dataloader, desc=f"Epoch {epoch+1}/{self.num_epochs}", leave=False)
             for batch in pbar:
