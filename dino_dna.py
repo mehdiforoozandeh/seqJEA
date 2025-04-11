@@ -193,6 +193,19 @@ class DINO:
                     avg_student_entropy = sum(student_entropies) / len(student_entropies)
                     normalized_student_entropy = avg_student_entropy / max_entropy
 
+                    # Compute KL divergence between teacher and each student view,
+                    # then average over views to obtain the batch average.
+                    kl_div_sum = 0.0
+                    for view_out in student_outputs:
+                        # Compute student log probabilities (with temperature scaling).
+                        student_log_probs = F.log_softmax(view_out / self.tps, dim=1)
+                        # Compute teacher probabilities (with temperature scaling and center adjustment).
+                        teacher_probs_scaled = F.softmax((teacher_output - self.center) / self.tpt, dim=1)
+                        kl_div = F.kl_div(student_log_probs, teacher_probs_scaled, reduction='batchmean')
+                        kl_div_sum += kl_div.item()
+                    batch_avg_kl_div = kl_div_sum / n_views
+                    epoch_kl_div += batch_avg_kl_div
+
                     # Skip the batch if loss is NaN
                     if torch.isnan(loss):
                         self.optimizer.zero_grad()
@@ -257,8 +270,9 @@ class DINO:
             avg_teacher_std = total_teacher_std / batch_count if batch_count > 0 else float('nan')
             avg_teacher_entropy = total_teacher_entropy / batch_count if batch_count > 0 else float('nan')
             avg_student_entropy = total_student_entropy / batch_count if batch_count > 0 else float('nan')
+            avg_kl_div = epoch_kl_div / batch_count if batch_count > 0 else float('nan')
             print(f"Epoch {epoch+1}/{self.num_epochs}, Loss: {avg_loss:.3}, T_Std: {avg_teacher_std:.3f}, "
-                f"T_Ent: {avg_teacher_entropy:.3f}, S_Ent: {avg_student_entropy:.3f}")
+                f"T_Ent: {avg_teacher_entropy:.3f}, S_Ent: {avg_student_entropy:.3f}, KL_Div: {avg_kl_div:.3f}")
 
             # Run benchmarks every 150 epochs
             if (epoch + 1) % 100 == 0:
