@@ -301,7 +301,7 @@ if __name__ == "__main__":
     learning_rate = 1e-4
     l = 0.99
     m = 0.9
-    tps = 0.2
+    tps = 0.4
     tpt = 0.04
 
     num_layers = num_layers // 2
