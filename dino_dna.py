@@ -300,7 +300,7 @@ if __name__ == "__main__":
     # learning_rate = 0.0005*(batch_size*5)/256 # following the dino paper
     learning_rate = 1e-4
     l = 0.996
-    m = 0.99
+    m = 0.9
     tps = 0.1
     tpt = 0.04
 
