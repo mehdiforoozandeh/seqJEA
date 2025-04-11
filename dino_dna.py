@@ -298,7 +298,8 @@ if __name__ == "__main__":
     num_epochs = 10000
     fractions = [0.25, 0.5, 0.75]
     # learning_rate = 0.0005*(batch_size*5)/256 # following the dino paper
-    learning_rate = 2e-4
+    # learning_rate = 2e-4
+    
 
     # l = 0.995
     # m = 0.995
@@ -310,6 +311,7 @@ if __name__ == "__main__":
     m = 0
     tps = 0.1
     tpt = 0.04
+    learning_rate = 2e-3
 
     num_layers = num_layers // 2
     context_length = context_length // 2
