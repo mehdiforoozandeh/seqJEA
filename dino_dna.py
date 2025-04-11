@@ -295,7 +295,7 @@ if __name__ == "__main__":
     max_len_seq = 8192  # maximum sequence length for dataset
     context_length = 1024  # model's context length (max_len for transformer)
     dropout = 0.05
-    num_epochs = 1000
+    num_epochs = 10000
     fractions = [0.25, 0.5, 0.75]
     # learning_rate = 0.0005*(batch_size*5)/256 # following the dino paper
     learning_rate = 2e-4
@@ -324,7 +324,7 @@ if __name__ == "__main__":
     # Create dataset and dataloader.
     dataset = DNADataset(
         min_length=max_len_seq//2, max_length=max_len_seq, 
-        context_length=context_length, dataset_size=200, 
+        context_length=context_length, dataset_size=300, 
         subset_fracs=fractions)
 
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
