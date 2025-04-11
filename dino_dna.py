@@ -282,10 +282,11 @@ if __name__ == "__main__":
     dropout = 0.05
     num_epochs = 1000
     fractions = [0.25, 0.5, 0.75]
-    l = 0.995
-    m = 0.995
-    tps = 0.5
-    tpt = 0.05  
+    learning_rate = 0.0005*(batch_size*5)/256 # following the dino paper
+    l = 0.996
+    m = 0.99
+    tps = 0.1
+    tpt = 0.04
 
     # Load tokenizer and obtain token IDs for special tokens.
     tokenizer = AutoTokenizer.from_pretrained("zhihan1996/DNABERT-2-117M")
@@ -330,7 +331,7 @@ if __name__ == "__main__":
     teacher_model.load_state_dict(model.state_dict())
 
     # Optimizer for student model.
-    optimizer = optim.SGD(model.parameters(), lr=2e-4)
+    optimizer = optim.SGD(model.parameters(), lr=learning_rate)
 
     dino = DINO(model, teacher_model, dataloader, optimizer, num_epochs, 
         tokenizer, l, m, tps, tpt, device_student, device_teacher)
