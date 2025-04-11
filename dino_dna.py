@@ -300,14 +300,14 @@ if __name__ == "__main__":
     # learning_rate = 0.0005*(batch_size*5)/256 # following the dino paper
     learning_rate = 2e-4
 
-    l = 0.995
-    m = 0.995
-    tps = 0.5
-    tpt = 0.05  
-    
-    # l = 0.99
-    # m = 0.9
-    # tps = 0.4
+    # l = 0.995
+    # m = 0.995
+    # tps = 0.5
+    # tpt = 0.05  
+
+    # l = 0.996
+    # m = 0.995
+    # tps = 0.1
     # tpt = 0.04
 
     num_layers = num_layers // 2
@@ -324,7 +324,7 @@ if __name__ == "__main__":
     # Create dataset and dataloader.
     dataset = DNADataset(
         min_length=max_len_seq//2, max_length=max_len_seq, 
-        context_length=context_length, dataset_size=100, 
+        context_length=context_length, dataset_size=200, 
         subset_fracs=fractions)
 
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
