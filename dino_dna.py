@@ -304,9 +304,9 @@ if __name__ == "__main__":
     tps = 0.2
     tpt = 0.04
 
-    num_layers /= 2
-    context_length /= 2
-    max_len_seq /= 2
+    num_layers = num_layers // 2
+    context_length = context_length // 2
+    max_len_seq = max_len_seq // 2
     batch_size *= 8
 
     # Load tokenizer and obtain token IDs for special tokens.
