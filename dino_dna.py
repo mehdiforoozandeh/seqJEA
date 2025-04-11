@@ -199,9 +199,9 @@ class DINO:
                     kl_div_sum = 0.0
                     for view_out in student_outputs:
                         # Compute student log probabilities (with temperature scaling).
-                        student_log_probs = F.log_softmax(view_out / self.tps, dim=1)
+                        student_log_probs = F.log_softmax(view_out, dim=1)
                         # Compute teacher probabilities (with temperature scaling and center adjustment).
-                        teacher_probs_scaled = F.softmax((teacher_output - self.center) / self.tpt, dim=1)
+                        teacher_probs_scaled = F.softmax(teacher_output, dim=1)
                         kl_div = F.kl_div(student_log_probs, teacher_probs_scaled, reduction='batchmean')
                         kl_div_sum += kl_div.item()
                     batch_avg_kl_div = kl_div_sum / n_views
