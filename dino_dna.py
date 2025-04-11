@@ -299,7 +299,7 @@ if __name__ == "__main__":
     fractions = [0.25, 0.5, 0.75]
     # learning_rate = 0.0005*(batch_size*5)/256 # following the dino paper
     learning_rate = 1e-4
-    l = 0.996
+    l = 0.99
     m = 0.9
     tps = 0.2
     tpt = 0.04
