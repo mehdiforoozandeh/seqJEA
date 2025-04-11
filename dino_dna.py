@@ -282,7 +282,8 @@ if __name__ == "__main__":
     dropout = 0.05
     num_epochs = 1000
     fractions = [0.25, 0.5, 0.75]
-    learning_rate = 0.0005*(batch_size*5)/256 # following the dino paper
+    # learning_rate = 0.0005*(batch_size*5)/256 # following the dino paper
+    learning_rate = 0.0005
     l = 0.996
     m = 0.99
     tps = 0.1
