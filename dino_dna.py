@@ -305,10 +305,10 @@ if __name__ == "__main__":
     # tps = 0.5
     # tpt = 0.05  
 
-    # l = 0.996
-    # m = 0.995
-    # tps = 0.1
-    # tpt = 0.04
+    l = 0.996
+    m = 0.995
+    tps = 0.1
+    tpt = 0.04
 
     num_layers = num_layers // 2
     context_length = context_length // 2
