@@ -141,8 +141,6 @@ class DINO:
         Args:
             accumulation_steps (int): Number of batches to accumulate gradients over before updating parameters.
         """
-        self.teacher_model.eval()
-        self.model.train()
 
         validation_results = {
             "student": [],
@@ -153,8 +151,8 @@ class DINO:
         self.benchmark.model = self.teacher_model
         teacher_results = self.benchmark.run_all_benchmarks()
 
-        validation_results["student"].append[student_results]
-        validation_results["teacher"].append[teacher_results]
+        validation_results["student"].append(student_results)
+        validation_results["teacher"].append(teacher_results)
 
         # Print a table-style result.
         header = f"{'Benchmark':<50} {'Student AUC':<10} {'Teacher AUC':<10}"
@@ -167,6 +165,9 @@ class DINO:
         stu_score = sum(list(student_results.values()))/ len(student_results)
         print(f"Mean Student AUC: {stu_score:<10.4f} | Mean Teacher AUC: {tch_score:<10.4f}")
         print("-" * (len(header) + 10))
+
+        self.teacher_model.eval()
+        self.model.train()
 
         for epoch in range(self.num_epochs):
             total_loss = 0.0
@@ -322,8 +323,6 @@ class DINO:
                 print("-" * (len(header) + 10))
 
             return results
-
-
                 
 ####################################
 # Usage
