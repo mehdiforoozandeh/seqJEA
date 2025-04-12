@@ -144,6 +144,30 @@ class DINO:
         self.teacher_model.eval()
         self.model.train()
 
+        validation_results = {
+            "student": [],
+            "teacher": []
+        }
+        self.benchmark.model = self.model
+        student_results = self.benchmark.run_all_benchmarks()
+        self.benchmark.model = self.teacher_model
+        teacher_results = self.benchmark.run_all_benchmarks()
+
+        validation_results["student"].append[student_results]
+        validation_results["teacher"].append[teacher_results]
+
+        # Print a table-style result.
+        header = f"{'Benchmark':<50} {'Student AUC':<10} {'Teacher AUC':<10}"
+        print("\n" + header)
+        print("-" * (len(header) + 10))
+        for bench in student_results.keys():
+            print(f"{bench:<50} {student_results[bench]:<10.4f} {teacher_results[bench]:<10.4f}")
+        print("-" * (len(header) + 10))
+        tch_score = sum(list(teacher_results.values()))/ len(teacher_results)
+        stu_score = sum(list(student_results.values()))/ len(student_results)
+        print(f"Mean Student AUC: {stu_score:<10.4f} | Mean Teacher AUC: {tch_score:<10.4f}")
+        print("-" * (len(header) + 10))
+
         for epoch in range(self.num_epochs):
             total_loss = 0.0
             total_teacher_std = 0.0
@@ -276,9 +300,30 @@ class DINO:
                 f"T_Ent: {avg_teacher_entropy:.3f}, S_Ent: {avg_student_entropy:.3f}, KL_Div: {avg_kl_div:.3f}")
 
             # Run benchmarks every 150 epochs
-            if (epoch + 1) % 100 == 0:
+            if (epoch + 1) % 10 == 0:
                 self.benchmark.model = self.model
-                results =self.benchmark.run_all_benchmarks()
+                student_results = self.benchmark.run_all_benchmarks()
+                self.benchmark.model = self.teacher_model
+                teacher_results = self.benchmark.run_all_benchmarks()
+
+                validation_results["student"].append[student_results]
+                validation_results["teacher"].append[teacher_results]
+
+                # Print a table-style result.
+                header = f"{'Benchmark':<50} {'Student AUC':<10} {'Teacher AUC':<10}"
+                print("\n" + header)
+                print("-" * (len(header) + 10))
+                for bench in student_results.keys():
+                    print(f"{bench:<50} {student_results[bench]:<10.4f} {teacher_results[bench]:<10.4f}")
+                print("-" * (len(header) + 10))
+                tch_score = sum(list(teacher_results.values()))/ len(teacher_results)
+                stu_score = sum(list(student_results.values()))/ len(student_results)
+                print(f"Mean Student AUC: {stu_score:<10.4f} | Mean Teacher AUC: {tch_score:<10.4f}")
+                print("-" * (len(header) + 10))
+
+            return results
+
+
                 
 ####################################
 # Usage

@@ -163,7 +163,7 @@ class BenchmarkEvaluator:
         # print(f"Benchmark: {benchmark_dir}, AUC ROC: {auc:.4f}")
         return auc
 
-    def run_all_benchmarks(self, verbose=True):
+    def run_all_benchmarks(self, verbose=False):
         """
         Run all benchmarks provided in the initialization.
         
