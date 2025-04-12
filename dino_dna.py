@@ -282,7 +282,7 @@ class DINO:
                 f"T_Ent: {avg_teacher_entropy:.3f}, S_Ent: {avg_student_entropy:.3f}, KL_Div: {avg_kl_div:.3f}")
 
             # Run benchmarks every 150 epochs
-            if (epoch + 1) % 10 == 0:
+            if (epoch + 1) % 100 == 0:
                 self.benchmark.model = self.model
                 student_results = self.benchmark.run_all_benchmarks()
                 self.benchmark.model = self.teacher_model
