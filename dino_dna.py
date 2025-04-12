@@ -288,8 +288,8 @@ class DINO:
                 self.benchmark.model = self.teacher_model
                 teacher_results = self.benchmark.run_all_benchmarks()
 
-                validation_results["student"].append[student_results]
-                validation_results["teacher"].append[teacher_results]
+                validation_results["student"].append(student_results)
+                validation_results["teacher"].append(teacher_results)
 
                 # Print a table-style result.
                 header = f"{'Benchmark':<50} {'Student AUC':<10} {'Teacher AUC':<10}"
