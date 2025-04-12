@@ -146,25 +146,6 @@ class DINO:
             "student": [],
             "teacher": []
         }
-        self.benchmark.model = self.model
-        student_results = self.benchmark.run_all_benchmarks()
-        self.benchmark.model = self.teacher_model
-        teacher_results = self.benchmark.run_all_benchmarks()
-
-        validation_results["student"].append(student_results)
-        validation_results["teacher"].append(teacher_results)
-
-        # Print a table-style result.
-        header = f"{'Benchmark':<50} {'Student AUC':<10} {'Teacher AUC':<10}"
-        print("\n" + header)
-        print("-" * (len(header) + 10))
-        for bench in student_results.keys():
-            print(f"{bench:<50} {student_results[bench]:<10.4f} {teacher_results[bench]:<10.4f}")
-        print("-" * (len(header) + 10))
-        tch_score = sum(list(teacher_results.values()))/ len(teacher_results)
-        stu_score = sum(list(student_results.values()))/ len(student_results)
-        print(f"Mean Student AUC: {stu_score:<10.4f} | Mean Teacher AUC: {tch_score:<10.4f}")
-        print("-" * (len(header) + 10))
 
         self.teacher_model.eval()
         self.model.train()
@@ -315,14 +296,12 @@ class DINO:
                 print("\n" + header)
                 print("-" * (len(header) + 10))
                 for bench in student_results.keys():
-                    print(f"{bench:<50} {student_results[bench]:<10.4f} {teacher_results[bench]:<10.4f}")
+                    print(f"{bench:<50} {student_results[bench]:<15.4f} {teacher_results[bench]:<15.4f}")
                 print("-" * (len(header) + 10))
                 tch_score = sum(list(teacher_results.values()))/ len(teacher_results)
                 stu_score = sum(list(student_results.values()))/ len(student_results)
-                print(f"Mean Student AUC: {stu_score:<10.4f} | Mean Teacher AUC: {tch_score:<10.4f}")
+                print(f"Mean Student AUC: {stu_score:<15.4f} | Mean Teacher AUC: {tch_score:<15.4f}")
                 print("-" * (len(header) + 10))
-
-            return results
                 
 ####################################
 # Usage
@@ -340,22 +319,21 @@ if __name__ == "__main__":
     context_length = 1024  # model's context length (max_len for transformer)
     dropout = 0.05
     num_epochs = 10000
-    fractions = [0.25, 0.5, 0.75]
+    fractions = [0.5, 0.66, 0.75]
     # learning_rate = 0.0005*(batch_size*5)/256 # following the dino paper
-    # learning_rate = 2e-4
+    learning_rate = 2e-4
     
 
     # l = 0.995
     # m = 0.995
-    # tps = 0.5
+    tps = 0.5
     # tpt = 0.05  
 
     l = 0.996
-    # m = 0.995
-    m = 0
-    tps = 0.1
+    m = 0.995
+    # m = 0
+    # tps = 0.1
     tpt = 0.04
-    learning_rate = 2e-3
 
     num_layers = num_layers // 2
     context_length = context_length // 2
