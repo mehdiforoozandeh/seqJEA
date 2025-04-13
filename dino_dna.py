@@ -339,7 +339,7 @@ def objective(trial):
     projection_dim = embed_dim
     max_len_seq = 8192 *2
     context_length = 1024 *2
-    num_epochs_trial = 5
+    num_epochs_trial = 1
     # num_epochs_trial = 1024
     fractions = [0.5, 0.66, 0.75]
     accumulation_steps = 32
@@ -393,6 +393,8 @@ def objective(trial):
         # If the model collapses, we penalize this trial.
         print("Trial failed with exception:", e)
         return float("inf")
+
+    del model, teacher_model
     
     # --- Evaluation ---
     student_results = dino_trainer.benchmark.run_all_benchmarks()
@@ -406,7 +408,8 @@ def objective(trial):
         raise optuna.exceptions.TrialPruned()
     
     # Clean up
-    del model, teacher_model, dino_trainer
+    del dino_trainer
+    # del model, teacher_model, dino_trainer
     torch.cuda.empty_cache()
     gc.collect()
 
