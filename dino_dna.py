@@ -321,11 +321,11 @@ import optuna
 def objective(trial):
     # --- Sample Hyperparameters ---
     learning_rate = trial.suggest_loguniform("learning_rate", 1e-5, 1e-2)
-    l = trial.suggest_uniform("ema_decay", 0.9, 0.999)  # EMA decay coefficient
-    m = trial.suggest_uniform("center_update", 0.9, 0.999)  # Center update coefficient
-    tps = trial.suggest_uniform("tps", 0.1, 1.0)  # Student temperature scaling
-    tpt = trial.suggest_uniform("tpt", 0.01, 0.1)  # Teacher temperature scaling
-    dropout = trial.suggest_uniform("dropout", 0.01, 0.1)
+    l = trial.suggest_float("ema_decay", 0.9, 0.999, log=True)  # EMA decay coefficient
+    m = trial.suggest_float("center_update", 0.9, 0.999)  # Center update coefficient
+    tps = trial.suggest_float("tps", 0.1, 1.0)  # Student temperature scaling
+    tpt = trial.suggest_float("tpt", 0.01, 0.1)  # Teacher temperature scaling
+    dropout = trial.suggest_float("dropout", 0.01, 0.1)
 
     # --- Define Other Hyperparameters (Fixed or based on trial suggestions) ---
     model_type = "alibi"  # or "relative"
