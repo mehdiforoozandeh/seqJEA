@@ -320,8 +320,8 @@ import optuna
 # We wrap your training loop within an objective function.
 def objective(trial):
     # --- Sample Hyperparameters ---
-    learning_rate = trial.suggest_loguniform("learning_rate", 1e-5, 1e-2)
-    l = trial.suggest_float("ema_decay", 0.9, 0.999, log=True)  # EMA decay coefficient
+    learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-2, log=True)
+    l = trial.suggest_float("ema_decay", 0.9, 0.999)  # EMA decay coefficient
     m = trial.suggest_float("center_update", 0.9, 0.999)  # Center update coefficient
     tps = trial.suggest_float("tps", 0.1, 1.0)  # Student temperature scaling
     tpt = trial.suggest_float("tpt", 0.01, 0.1)  # Teacher temperature scaling
