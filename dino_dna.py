@@ -358,7 +358,7 @@ if __name__ == "__main__":
     # Create dataset and dataloader.
     dataset = DNADataset(
         min_length=max_len_seq//2, max_length=max_len_seq, 
-        context_length=context_length, dataset_size=10, 
+        context_length=context_length, dataset_size=50, 
         subset_fracs=fractions)
 
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
