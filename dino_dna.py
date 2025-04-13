@@ -328,7 +328,7 @@ def objective(trial):
     dropout = trial.suggest_float("dropout", 0.01, 0.1)
 
     # --- Define Other Hyperparameters (Fixed or based on trial suggestions) ---
-    model_type = "alibi"  # or "relative"
+    model_type = "alibi" 
     batch_size = 2
     embed_dim = 384
     num_layers = 3
@@ -344,7 +344,7 @@ def objective(trial):
 
     # --- Device Setup ---
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    device_teacher = device_student = device  # Use a single device for quicker prototyping
+    device_teacher = device_student = device
 
     # --- Load Tokenizer and Special Tokens ---
     tokenizer = AutoTokenizer.from_pretrained("zhihan1996/DNABERT-2-117M")
@@ -354,7 +354,7 @@ def objective(trial):
 
     # --- Create Dataset and DataLoader ---
     dataset = DNADataset(
-        min_length=max_len_seq//2, max_length=max_len_seq, 
+        min_length=max_len_seq//3, max_length=max_len_seq, 
         context_length=context_length, dataset_size=128, 
         subset_fracs=fractions)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
@@ -385,7 +385,6 @@ def objective(trial):
                         tokenizer, l, m, tps, tpt, device_student, device_teacher)
 
     # --- Run Training ---
-    # You can catch signals of collapse (e.g., excessively high loss, NaNs) and report them.
     try:
         dino_trainer.train_dino(accumulation_steps=accumulation_steps)
     except Exception as e:
@@ -394,17 +393,10 @@ def objective(trial):
         return float("inf")
     
     # --- Evaluation ---
-    # After training, perform a quick benchmark.
-    # For example, use the BenchmarkEvaluator to compute a validation metric.
     dino_trainer.benchmark.model = model
     student_results = dino_trainer.benchmark.run_all_benchmarks()
     
-    # You can define your objective metric based on AUC, R2, or a combination.
-    # For instance, suppose you want to minimize the negative mean AUC across benchmarks:
     student_auc_mean = sum([v['roc_auc'] for v in student_results.values()]) / len(student_results)
-    
-    # Alternatively, if loss is a good proxy for stability, you might also use that.
-    # Here we assume maximizing AUC is the goal (so we minimize the negative AUC).
     objective_value = -student_auc_mean
 
     # Optionally, report intermediate metrics to Optuna for pruning.
@@ -422,7 +414,7 @@ def objective(trial):
 if __name__ == "__main__":
     # --- Run the Optuna Study ---
     study = optuna.create_study(direction="minimize")  # since we're minimizing negative AUC
-    study.optimize(objective, n_trials=10)
+    study.optimize(objective, n_trials=5)
 
     print("Best hyperparameters:")
     print(study.best_trial.params)
