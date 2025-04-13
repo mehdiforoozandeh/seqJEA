@@ -397,7 +397,7 @@ def objective(trial):
         return float("inf")
 
     best_avg_score = -float("inf")
-    for bench_results in dino_trainer.validation_results["student"]:
+    for bench_results in validation_results["student"]:
         avg_auc = sum(score["roc_auc"] for score in bench_results.values()) / len(bench_results)
 
         if avg_auc > best_avg_score:
