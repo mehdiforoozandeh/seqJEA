@@ -314,92 +314,117 @@ class DINO:
                 print("-" * (len(header) + 10))
 
 ####################################
-# Usage
+# OPTUNA
 ####################################
-if __name__ == "__main__":
-    # Hyperparameters
-    model_type = "sinusoidal" #"alibi"
+
+import optuna
+
+# We wrap your training loop within an objective function.
+def objective(trial):
+    # --- Sample Hyperparameters ---
+    learning_rate = trial.suggest_loguniform("learning_rate", 1e-5, 1e-2)
+    l = trial.suggest_uniform("ema_decay", 0.9, 0.999)  # EMA decay coefficient
+    m = trial.suggest_uniform("center_update", 0.9, 0.999)  # Center update coefficient
+    tps = trial.suggest_uniform("tps", 0.1, 1.0)  # Student temperature scaling
+    tpt = trial.suggest_uniform("tpt", 0.01, 0.1)  # Teacher temperature scaling
+    dropout = trial.suggest_uniform("dropout", 0.01, 0.1)
+
+    # --- Define Other Hyperparameters (Fixed or based on trial suggestions) ---
+    model_type = "alibi"  # or "relative"
     batch_size = 2
     embed_dim = 384
     num_layers = 6
     num_heads = 6
     dim_feedforward = 2 * embed_dim
     projection_dim = embed_dim
-    max_len_seq = 8192  # maximum sequence length for dataset
-    context_length = 1024  # model's context length (max_len for transformer)
-    dropout = 0.05
-    num_epochs = 10000
+    max_len_seq = 8192 *2
+    context_length = 1024 *2
+    num_epochs_trial = 5
+    # num_epochs_trial = 1024
     fractions = [0.5, 0.66, 0.75]
-    # learning_rate = 0.0005*(batch_size*5)/256 # following the dino paper
-    learning_rate = 2e-4
-    
+    accumulation_steps = 32
 
-    # l = 0.995
-    # m = 0.995
-    tps = 0.5
-    # tpt = 0.05  
+    # --- Device Setup ---
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device_teacher = device_student = device  # Use a single device for quicker prototyping
 
-    l = 0.996
-    m = 0.995
-    # tps = 0.1
-    tpt = 0.04
-
-    num_layers = int(num_layers/2)
-    max_len_seq = int(max_len_seq*2)
-    context_length = int(context_length*2)
-    batch_size = 2
-
-    # num_layers = num_layers // 2
-    # context_length = context_length // 2
-    # max_len_seq = max_len_seq // 2
-    # batch_size *= 8
-
-    # Load tokenizer and obtain token IDs for special tokens.
+    # --- Load Tokenizer and Special Tokens ---
     tokenizer = AutoTokenizer.from_pretrained("zhihan1996/DNABERT-2-117M")
     VOCAB_SIZE = 4096
     mask_token_id = tokenizer.mask_token_id
     pad_token_id = tokenizer.pad_token_id
 
-    # Create dataset and dataloader.
+    # --- Create Dataset and DataLoader ---
     dataset = DNADataset(
         min_length=max_len_seq//2, max_length=max_len_seq, 
-        context_length=context_length, dataset_size=50, 
+        context_length=context_length, dataset_size=128, 
         subset_fracs=fractions)
-
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
-    # Instantiate student and teacher models on their respective devices.
+    # --- Initialize Models ---
     model = UnifiedDNATransformer(
-        model_type, 
-        vocab_size=VOCAB_SIZE, 
-        embed_dim=embed_dim, 
-        num_layers=num_layers, 
-        num_heads=num_heads,
-        dim_feedforward=dim_feedforward, 
-        max_len=context_length, 
-        projection_dim=embed_dim, 
-        dropout=dropout
+        model_type, vocab_size=VOCAB_SIZE, embed_dim=embed_dim,
+        num_layers=num_layers, num_heads=num_heads,
+        dim_feedforward=dim_feedforward, max_len=context_length,
+        projection_dim=embed_dim, dropout=dropout
     ).to(device_student)
 
     teacher_model = UnifiedDNATransformer(
-        model_type, 
-        vocab_size=VOCAB_SIZE, 
-        embed_dim=embed_dim, 
-        num_layers=num_layers, 
-        num_heads=num_heads,
-        dim_feedforward=dim_feedforward, 
-        max_len=context_length, 
-        projection_dim=embed_dim, 
-        dropout=dropout
+        model_type, vocab_size=VOCAB_SIZE, embed_dim=embed_dim,
+        num_layers=num_layers, num_heads=num_heads,
+        dim_feedforward=dim_feedforward, max_len=context_length,
+        projection_dim=embed_dim, dropout=dropout
     ).to(device_teacher)
-
-    # Initialize teacher with student's weights.
+    
+    # --- Initialize teacher with student's weights ---
     teacher_model.load_state_dict(model.state_dict())
 
-    # Optimizer for student model.
+    # --- Define Optimizer ---
     optimizer = optim.SGD(model.parameters(), lr=learning_rate)
 
-    dino = DINO(model, teacher_model, dataloader, optimizer, num_epochs, 
-        tokenizer, l, m, tps, tpt, device_student, device_teacher)
+    # --- Instantiate DINO Trainer ---
+    dino_trainer = DINO(model, teacher_model, dataloader, optimizer, num_epochs_trial,
+                        tokenizer, l, m, tps, tpt, device_student, device_teacher)
 
-    dino.train_dino(accumulation_steps=10)
+    # --- Run Training ---
+    # You can catch signals of collapse (e.g., excessively high loss, NaNs) and report them.
+    try:
+        dino_trainer.train_dino(accumulation_steps=accumulation_steps)
+    except Exception as e:
+        # If the model collapses, we penalize this trial.
+        print("Trial failed with exception:", e)
+        return float("inf")
+    
+    # --- Evaluation ---
+    # After training, perform a quick benchmark.
+    # For example, use the BenchmarkEvaluator to compute a validation metric.
+    dino_trainer.benchmark.model = model
+    student_results = dino_trainer.benchmark.run_all_benchmarks()
+    
+    # You can define your objective metric based on AUC, R2, or a combination.
+    # For instance, suppose you want to minimize the negative mean AUC across benchmarks:
+    student_auc_mean = sum([v['roc_auc'] for v in student_results.values()]) / len(student_results)
+    
+    # Alternatively, if loss is a good proxy for stability, you might also use that.
+    # Here we assume maximizing AUC is the goal (so we minimize the negative AUC).
+    objective_value = -student_auc_mean
+
+    # Optionally, report intermediate metrics to Optuna for pruning.
+    trial.report(objective_value, step=1)
+    if trial.should_prune():
+        raise optuna.exceptions.TrialPruned()
+    
+    # Clean up
+    del model, teacher_model, dino_trainer
+    torch.cuda.empty_cache()
+    gc.collect()
+
+    return objective_value
+
+if __name__ == "__main__":
+    # --- Run the Optuna Study ---
+    study = optuna.create_study(direction="minimize")  # since we're minimizing negative AUC
+    study.optimize(objective, n_trials=10)
+
+    print("Best hyperparameters:")
+    print(study.best_trial.params)
