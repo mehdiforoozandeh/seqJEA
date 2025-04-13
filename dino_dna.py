@@ -311,6 +311,8 @@ class DINO:
                 print(f"Mean Teacher AUC: {mean_teacher_auc:<12.4f} | Mean Teacher R2: {mean_teacher_r2:<12.4f}")
                 print("-" * (len(header) + 10))
 
+                self.benchmark.model = self.model
+
 ####################################
 # OPTUNA
 ####################################
@@ -393,7 +395,6 @@ def objective(trial):
         return float("inf")
     
     # --- Evaluation ---
-    dino_trainer.benchmark.model = model
     student_results = dino_trainer.benchmark.run_all_benchmarks()
     
     student_auc_mean = sum([v['roc_auc'] for v in student_results.values()]) / len(student_results)
