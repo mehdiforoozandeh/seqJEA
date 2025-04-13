@@ -397,4 +397,4 @@ if __name__ == "__main__":
     dino = DINO(model, teacher_model, dataloader, optimizer, num_epochs, 
         tokenizer, l, m, tps, tpt, device_student, device_teacher)
 
-    dino.train_dino()
+    dino.train_dino(accumulation_steps=10)
