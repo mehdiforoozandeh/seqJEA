@@ -268,6 +268,7 @@ class DINO:
             if step_count % accumulation_steps != 0:
                 self.optimizer.step()
                 self.optimizer.zero_grad()
+                
                 self.update_teacher()
                 with torch.no_grad():
                     self.update_center(teacher_output)
@@ -343,11 +344,11 @@ if __name__ == "__main__":
     # tps = 0.1
     tpt = 0.04
 
-    num_layers = num_layers // 2
-    context_length = context_length // 2
-    max_len_seq = max_len_seq // 2
-    num_layers = num_layers // 2
-    batch_size *= 8
+    # num_layers = num_layers // 2
+    # context_length = context_length // 2
+    # max_len_seq = max_len_seq // 2
+    # num_layers = num_layers // 2
+    # batch_size *= 8
 
     # Load tokenizer and obtain token IDs for special tokens.
     tokenizer = AutoTokenizer.from_pretrained("zhihan1996/DNABERT-2-117M")
