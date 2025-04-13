@@ -346,7 +346,7 @@ if __name__ == "__main__":
 
     max_len_seq *= 2
     context_length *= 2
-    batch_size /= 2
+    batch_size = 1
 
     # num_layers = num_layers // 2
     # context_length = context_length // 2
