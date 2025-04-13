@@ -281,7 +281,7 @@ class DINO:
                 f"T_Ent: {avg_teacher_entropy:.3f}, S_Ent: {avg_student_entropy:.3f}, KL_Div: {avg_kl_div:.3f}")
 
             # Run benchmarks every 150 epochs
-            if (epoch + 1) % 100 == 0:
+            if (epoch + 1) % 100 == 0 or (epoch + 1) == self.num_epochs:
                 self.benchmark.model = self.model
                 student_results = self.benchmark.run_all_benchmarks()
                 self.benchmark.model = self.teacher_model
@@ -313,6 +313,8 @@ class DINO:
 
                 self.benchmark.model = self.model
 
+        return validation_results
+
 ####################################
 # OPTUNA
 ####################################
@@ -339,7 +341,7 @@ def objective(trial):
     projection_dim = embed_dim
     max_len_seq = 8192 *2
     context_length = 1024 *2
-    num_epochs_trial = 1
+    num_epochs_trial = 3
     # num_epochs_trial = 1024
     fractions = [0.5, 0.66, 0.75]
     accumulation_steps = 32
@@ -388,16 +390,24 @@ def objective(trial):
 
     # --- Run Training ---
     try:
-        dino_trainer.train_dino(accumulation_steps=accumulation_steps)
+        validation_results = dino_trainer.train_dino(accumulation_steps=accumulation_steps)
     except Exception as e:
         # If the model collapses, we penalize this trial.
         print("Trial failed with exception:", e)
         return float("inf")
 
-    del model, teacher_model
-    
-    # --- Evaluation ---
-    student_results = dino_trainer.benchmark.run_all_benchmarks()
+    best_avg_score = -float("inf")
+    for bench_results in dino_trainer.validation_results["student"]:
+        avg_auc = sum(score["roc_auc"] for score in bench_results.values()) / len(bench_results)
+
+        if avg_auc > best_avg_score:
+            best_avg_score = avg_auc
+
+    objective_value = -best_avg_score
+
+    del dino_trainer, model, teacher_model
+    torch.cuda.empty_cache()
+    gc.collect()
     
     student_auc_mean = sum([v['roc_auc'] for v in student_results.values()]) / len(student_results)
     objective_value = -student_auc_mean
@@ -407,12 +417,7 @@ def objective(trial):
     if trial.should_prune():
         raise optuna.exceptions.TrialPruned()
     
-    # Clean up
-    del dino_trainer
-    # del model, teacher_model, dino_trainer
-    torch.cuda.empty_cache()
-    gc.collect()
-
+    
     return objective_value
 
 if __name__ == "__main__":
@@ -422,3 +427,21 @@ if __name__ == "__main__":
 
     print("Best hyperparameters:")
     print(study.best_trial.params)
+
+    # Write best hyperparameter setting to JSON file.
+    with open("best_setting.json", "w") as best_file:
+        json.dump(study.best_trial.params, best_file, indent=4)
+
+    # Collect settings from all trials. Here, for each trial we save its number, parameters, and objective value.
+    all_settings = []
+    for trial in study.trials:
+        trial_info = {
+            "trial_number": trial.number,
+            "params": trial.params,
+            "objective_value": trial.value,
+        }
+        all_settings.append(trial_info)
+
+    # Write all hyperparameter settings to JSON file.
+    with open("all_settings.json", "w") as all_file:
+        json.dump(all_settings, all_file, indent=4)
