@@ -331,7 +331,7 @@ def objective(trial):
     model_type = "alibi"  # or "relative"
     batch_size = 2
     embed_dim = 384
-    num_layers = 6
+    num_layers = 3
     num_heads = 6
     dim_feedforward = 2 * embed_dim
     projection_dim = embed_dim
