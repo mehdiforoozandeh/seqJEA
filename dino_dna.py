@@ -66,8 +66,6 @@ class DINO:
         self.tokenizer = tokenizer
         self.mask_token_id = tokenizer.mask_token_id
         self.pad_token_id = tokenizer.pad_token_id
-        self.mask_token_id = mask_token_id
-        self.pad_token_id = pad_token_id
         self.l = l
         self.m = m
         self.tps = tps
