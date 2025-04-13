@@ -292,17 +292,26 @@ class DINO:
                 validation_results["teacher"].append(teacher_results)
 
                 # Print a table-style result.
-                header = f"{'Benchmark':<50} {'Student AUC':<10} {'Teacher AUC':<10}"
+                header = f"{'Benchmark':<50} {'Student AUC':<12} {'Student R2':<12} {'Teacher AUC':<12} {'Teacher R2':<12}"
                 print("\n" + header)
                 print("-" * (len(header) + 10))
                 for bench in student_results.keys():
-                    print(f"{bench:<50} {student_results[bench]:<15.4f} {teacher_results[bench]:<15.4f}")
+                    s_auc = student_results[bench]['roc_auc']
+                    s_r2 = student_results[bench]['gc_r2']
+                    t_auc = teacher_results[bench]['roc_auc']
+                    t_r2 = teacher_results[bench]['gc_r2']
+                    print(f"{bench:<50} {s_auc:<12.4f} {s_r2:<12.4f} {t_auc:<12.4f} {t_r2:<12.4f}")
                 print("-" * (len(header) + 10))
-                tch_score = sum(list(teacher_results.values()))/ len(teacher_results)
-                stu_score = sum(list(student_results.values()))/ len(student_results)
-                print(f"Mean Student AUC: {stu_score:<15.4f} | Mean Teacher AUC: {tch_score:<15.4f}")
+
+                mean_student_auc = sum([v['roc_auc'] for v in student_results.values()]) / len(student_results)
+                mean_student_r2 = sum([v['gc_r2'] for v in student_results.values()]) / len(student_results)
+                mean_teacher_auc = sum([v['roc_auc'] for v in teacher_results.values()]) / len(teacher_results)
+                mean_teacher_r2 = sum([v['gc_r2'] for v in teacher_results.values()]) / len(teacher_results)
+
+                print(f"Mean Student AUC: {mean_student_auc:<12.4f} | Mean Student R2: {mean_student_r2:<12.4f}")
+                print(f"Mean Teacher AUC: {mean_teacher_auc:<12.4f} | Mean Teacher R2: {mean_teacher_r2:<12.4f}")
                 print("-" * (len(header) + 10))
-                
+
 ####################################
 # Usage
 ####################################
