@@ -344,8 +344,8 @@ if __name__ == "__main__":
     # tps = 0.1
     tpt = 0.04
 
-    max_len_seq *= 1.5
-    context_length *= 1.5
+    max_len_seq = int(max_len_seq)
+    context_length = int(context_length)
     batch_size = 1
 
     # num_layers = num_layers // 2
