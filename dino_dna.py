@@ -318,7 +318,7 @@ class DINO:
 ####################################
 if __name__ == "__main__":
     # Hyperparameters
-    model_type = "alibi"
+    model_type = "sinusoidal" #"alibi"
     batch_size = 2
     embed_dim = 384
     num_layers = 6
@@ -347,7 +347,6 @@ if __name__ == "__main__":
     # num_layers = num_layers // 2
     # context_length = context_length // 2
     # max_len_seq = max_len_seq // 2
-    # num_layers = num_layers // 2
     # batch_size *= 8
 
     # Load tokenizer and obtain token IDs for special tokens.
