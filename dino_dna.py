@@ -147,10 +147,10 @@ class DINO:
             "teacher": []
         }
 
-        self.teacher_model.eval()
-        self.model.train()
-
         for epoch in range(self.num_epochs):
+            self.teacher_model.eval()
+            self.model.train()
+
             total_loss = 0.0
             total_teacher_std = 0.0
             total_teacher_entropy = 0.0
@@ -340,7 +340,6 @@ if __name__ == "__main__":
 
     l = 0.996
     m = 0.995
-    # m = 0
     # tps = 0.1
     tpt = 0.04
 
