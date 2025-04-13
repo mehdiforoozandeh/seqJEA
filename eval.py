@@ -75,7 +75,7 @@ class BenchmarkEvaluator:
             # "GUE/EMP/H3/",
             # "GUE/splice/reconstructed/",
             "GUE/tf/4/"], 
-        batch_size=64, mode="dev"):
+        batch_size=32, mode="dev"):
         """
         Initialize the evaluator.
         
