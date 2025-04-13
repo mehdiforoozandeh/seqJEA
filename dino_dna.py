@@ -318,7 +318,7 @@ class DINO:
 ####################################
 if __name__ == "__main__":
     # Hyperparameters
-    model_type = "relative" #"alibi"
+    model_type = "sinusoidal" #"alibi"
     batch_size = 2
     embed_dim = 384
     num_layers = 6
@@ -344,8 +344,9 @@ if __name__ == "__main__":
     # tps = 0.1
     tpt = 0.04
 
-    max_len_seq = int(max_len_seq)
-    context_length = int(context_length)
+    num_layers /= 2
+    max_len_seq = int(max_len_seq*2)
+    context_length = int(context_length*2)
     batch_size = 1
 
     # num_layers = num_layers // 2
