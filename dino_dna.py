@@ -132,11 +132,11 @@ class DINO:
         }
 
         # Early stopping configuration
-        p_loss = 100                  # Patience for avg_loss improvement
+        p_loss = 50                  # Patience for avg_loss improvement
         p_std = 20                   # Patience for teacher std being near 0
         p_entropy = 30               # Patience for teacher or student entropy being close to 1
         p_entropy_low = 10           # Patience for teacher entropy being close to 0
-        p_kl = 100                    # Patience for avg KL divergence near 0
+        p_kl = 50                    # Patience for avg KL divergence near 0
         p_val_teacher = 3           # Patience for teacher validation improvements
         p_val_student_vs_teacher = 3  # Patience for student validation outperforming teacher
 
@@ -601,7 +601,7 @@ def objective(trial):
     max_len_seq = 8192 *2
     context_length = 1024 *2
     # num_epochs_trial = 3
-    num_epochs_trial = 1024
+    num_epochs_trial = 512
     fractions = [0.5, 0.66, 0.75]
     accumulation_steps = 32
 
@@ -678,7 +678,7 @@ def objective(trial):
 if __name__ == "__main__":
     # --- Run the Optuna Study ---
     study = optuna.create_study(direction="minimize")  # since we're minimizing negative AUC
-    study.optimize(objective, n_trials=100)
+    study.optimize(objective, n_trials=50)
 
     print("Best hyperparameters:")
     print(study.best_trial.params)
