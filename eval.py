@@ -71,10 +71,11 @@ class BenchmarkEvaluator:
         benchmark_dirs=[
             "GUE/prom/prom_300_tata/", 
             "GUE/prom/prom_core_tata/",
-            "GUE/EMP/H4/",
+            # "GUE/EMP/H4/",
             # "GUE/EMP/H3/",
             # "GUE/splice/reconstructed/",
-            "GUE/tf/4/"], 
+            # "GUE/tf/4/"
+            ], 
         batch_size=32, mode="dev"):
         """
         Initialize the evaluator.

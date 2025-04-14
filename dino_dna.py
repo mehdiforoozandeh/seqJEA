@@ -408,15 +408,11 @@ def objective(trial):
     del dino_trainer, model, teacher_model
     torch.cuda.empty_cache()
     gc.collect()
-    
-    student_auc_mean = sum([v['roc_auc'] for v in student_results.values()]) / len(student_results)
-    objective_value = -student_auc_mean
 
     # Optionally, report intermediate metrics to Optuna for pruning.
     trial.report(objective_value, step=1)
     if trial.should_prune():
         raise optuna.exceptions.TrialPruned()
-    
     
     return objective_value
 
