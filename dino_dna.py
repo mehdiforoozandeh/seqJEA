@@ -1,6 +1,6 @@
 import torch.nn as nn
 import torch.optim as optim
-import random, gc, os, torch, math
+import random, gc, os, torch, math, json
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 from data import DNADataset
@@ -124,27 +124,41 @@ class DINO:
 
     def train_dino(self, accumulation_steps=10):
         """
-        Train the DINO-DNA framework with gradient accumulation to handle small batch sizes.
-        
-        For each batch:
-        - Computes the teacher output for the global view.
-        - Generates subsequence and masked views.
-        - Merges all views into a single tensor to compute the student forward pass in one call.
-        - Computes loss and normalized entropies for each view.
-        - Accumulates gradients over `accumulation_steps` batches.
-        - Performs backpropagation and updates the student optimizer after accumulation.
-        - Updates the teacher network and the center vector.
-        - Cleans up intermediate variables to free memory.
-
-        Args:
-            accumulation_steps (int): Number of batches to accumulate gradients over before updating parameters.
+        Train the DINO-DNA framework with gradient accumulation and early stopping based on several criteria.
         """
-
         validation_results = {
             "student": [],
             "teacher": []
         }
 
+        # Early stopping configuration
+        p_loss = 5                  # Patience for avg_loss improvement
+        p_std = 3                   # Patience for teacher std being near 0
+        p_entropy = 5               # Patience for teacher or student entropy being close to 1
+        p_entropy_low = 5           # Patience for teacher entropy being close to 0
+        p_kl = 5                    # Patience for avg KL divergence near 0
+        p_val_teacher = 3           # Patience for teacher validation improvements
+        p_val_student_vs_teacher = 3  # Patience for student validation outperforming teacher
+
+        best_loss = float("inf")
+        loss_counter = 0
+
+        std_counter = 0
+        teacher_entropy_high_counter = 0
+        student_entropy_high_counter = 0
+        teacher_entropy_low_counter = 0
+        kl_counter = 0
+
+        # For validation-based early stopping:
+        best_teacher_val = -float("inf")
+        teacher_val_counter = 0
+        student_vs_teacher_counter = 0
+
+        # You may store the last teacher and student validation scores for condition (8)
+        last_teacher_val = None
+        last_student_val = None
+
+        # Main training loop.
         for epoch in range(self.num_epochs):
             self.teacher_model.eval()
             self.model.train()
@@ -154,38 +168,34 @@ class DINO:
             total_teacher_entropy = 0.0
             total_student_entropy = 0.0
             batch_count = 0
-            step_count = 0  # Counter for gradient accumulation steps
-            epoch_kl_div = 0.0  # Accumulate batch average KL divergence for the epoch
+            step_count = 0  # For gradient accumulation
+            epoch_kl_div = 0.0
 
             pbar = tqdm(self.dataloader, desc=f"Epoch {epoch+1}/{self.num_epochs}", leave=False)
             for batch in pbar:
                 try:
-                    # Do not clear gradients immediately; accumulate them
                     global_view = batch["global"].to(self.device_student)
 
-                    # Compute teacher output on teacher device then move to student device
                     with torch.no_grad():
                         teacher_output = self.teacher_model(global_view.to(self.device_teacher))
                         teacher_output = teacher_output.to(self.device_student)
 
-                    # Compute teacher statistics
+                    # Compute teacher statistics.
                     batch_teacher_std = teacher_output.std(dim=0).mean().item()
                     teacher_probs = F.softmax(teacher_output, dim=1)
                     teacher_entropy = - (teacher_probs * torch.log(teacher_probs + 1e-7)).sum(dim=1).mean().item()
                     max_entropy = math.log(teacher_output.size(1))
                     normalized_teacher_entropy = teacher_entropy / max_entropy
 
-                    # Combine views: global + subsequence + masked
+                    # Combine all views.
                     student_views = [batch[k] for k in batch.keys()]
                     n_views = len(student_views)
-                    merged_views = torch.cat(student_views, dim=0).to(self.device_student)  # [n_views * batch_size, context_length]
-
-                    # Student forward pass in one call
-                    merged_student_outputs = self.model(merged_views)  # [n_views * batch_size, projection_dim]
+                    merged_views = torch.cat(student_views, dim=0).to(self.device_student)
+                    merged_student_outputs = self.model(merged_views)
                     batch_size = global_view.size(0)
                     student_outputs = merged_student_outputs.view(n_views, batch_size, -1)
 
-                    # Compute loss and accumulate normalized student entropy
+                    # Compute loss and student entropy.
                     loss_sum = 0.0
                     student_entropies = []
                     for view_out in student_outputs:
@@ -193,37 +203,29 @@ class DINO:
                         s_probs = F.softmax(view_out, dim=1)
                         s_entropy = - (s_probs * torch.log(s_probs + 1e-7)).sum(dim=1).mean().item()
                         student_entropies.append(s_entropy)
-
                     loss = loss_sum / n_views
                     avg_student_entropy = sum(student_entropies) / len(student_entropies)
                     normalized_student_entropy = avg_student_entropy / max_entropy
 
-                    # Compute KL divergence between teacher and each student view,
-                    # then average over views to obtain the batch average.
+                    # Compute KL divergence.
                     kl_div_sum = 0.0
                     for view_out in student_outputs:
-                        # Compute student log probabilities (with temperature scaling).
                         student_log_probs = F.log_softmax(view_out, dim=1)
-                        # Compute teacher probabilities (with temperature scaling and center adjustment).
                         teacher_probs_scaled = F.softmax(teacher_output, dim=1)
                         kl_div = F.kl_div(student_log_probs, teacher_probs_scaled, reduction='batchmean')
                         kl_div_sum += kl_div.item()
                     batch_avg_kl_div = kl_div_sum / n_views
                     epoch_kl_div += batch_avg_kl_div
 
-                    # Skip the batch if loss is NaN
                     if torch.isnan(loss):
                         self.optimizer.zero_grad()
-                        self.clean_up_intermediates(
-                            global_view,  student_views, merged_views, merged_student_outputs, 
-                            student_outputs, teacher_output, loss)
+                        self.clean_up_intermediates(global_view, student_views, merged_views,
+                                                    merged_student_outputs, student_outputs, teacher_output, loss)
                         continue
 
-                    # Scale loss to simulate larger batch size and accumulate gradients
                     scaled_loss = loss / accumulation_steps
-                    scaled_loss.backward()  # Accumulates gradients
+                    scaled_loss.backward()
 
-                    # Update metrics for the current batch
                     total_loss += loss.item()
                     total_teacher_std += batch_teacher_std
                     total_teacher_entropy += normalized_teacher_entropy
@@ -231,30 +233,21 @@ class DINO:
                     batch_count += 1
                     step_count += 1
 
-                    # Perform optimization step after accumulating gradients for `accumulation_steps` batches
                     if step_count % accumulation_steps == 0:
                         self.optimizer.step()
                         self.optimizer.zero_grad()
-
-                        # Update teacher network via EMA
                         self.update_teacher()
-
-                        # Update center vector with teacher output
                         with torch.no_grad():
                             self.update_center(teacher_output)
 
-                    # Update tqdm postfix with current batch loss
                     pbar.set_postfix({'loss': f"{loss.item():.3f}"})
 
-                    # Clean up intermediates after each batch
-                    self.clean_up_intermediates(
-                        global_view, student_views, merged_views, 
-                        merged_student_outputs, student_outputs,
-                         teacher_output, loss)
+                    self.clean_up_intermediates(global_view, student_views, merged_views,
+                                                merged_student_outputs, student_outputs, teacher_output, loss)
 
                 except RuntimeError as e:
                     if "out of memory" in str(e):
-                        print("CUDA OOM error encountered, cleaning up and skipping this batch.")
+                        print("CUDA OOM error encountered, cleaning up and skipping batch.")
                         self.optimizer.zero_grad()
                         torch.cuda.empty_cache()
                         gc.collect()
@@ -262,25 +255,80 @@ class DINO:
                     else:
                         raise e
 
-            # If there are remaining accumulated gradients at the end of the epoch, update parameters
+            # Final update if any gradients remain.
             if step_count % accumulation_steps != 0:
                 self.optimizer.step()
                 self.optimizer.zero_grad()
-                
                 self.update_teacher()
                 with torch.no_grad():
                     self.update_center(teacher_output)
 
-            # Compute epoch averages
+            # Compute epoch averages.
             avg_loss = total_loss / batch_count if batch_count > 0 else float('nan')
             avg_teacher_std = total_teacher_std / batch_count if batch_count > 0 else float('nan')
             avg_teacher_entropy = total_teacher_entropy / batch_count if batch_count > 0 else float('nan')
             avg_student_entropy = total_student_entropy / batch_count if batch_count > 0 else float('nan')
             avg_kl_div = epoch_kl_div / batch_count if batch_count > 0 else float('nan')
-            print(f"Epoch {epoch+1}/{self.num_epochs}, Loss: {avg_loss:.3}, T_Std: {avg_teacher_std:.3f}, "
+            print(f"Epoch {epoch+1}/{self.num_epochs}, Loss: {avg_loss:.3f}, T_Std: {avg_teacher_std:.3f}, "
                 f"T_Ent: {avg_teacher_entropy:.3f}, S_Ent: {avg_student_entropy:.3f}, KL_Div: {avg_kl_div:.3f}")
 
-            # Run benchmarks every 150 epochs
+            # ---------------- Early Stopping Checks ---------------- #
+            # 1. Loss improvement.
+            if avg_loss < best_loss:
+                best_loss = avg_loss
+                loss_counter = 0
+            else:
+                loss_counter += 1
+            if loss_counter >= p_loss:
+                print("Early stopping triggered: Loss hasn't improved for", p_loss, "epochs")
+                break
+
+            # 2. Teacher std.
+            if avg_teacher_std < 1e-6:
+                std_counter += 1
+            else:
+                std_counter = 0
+            if std_counter >= p_std:
+                print("Early stopping triggered: Teacher STD remained near 0 for", p_std, "epochs")
+                break
+
+            # 3. Teacher entropy too high.
+            if avg_teacher_entropy >= 0.99:
+                teacher_entropy_high_counter += 1
+            else:
+                teacher_entropy_high_counter = 0
+            if teacher_entropy_high_counter >= p_entropy:
+                print("Early stopping triggered: Teacher entropy stayed too high (≈1) for", p_entropy, "epochs")
+                break
+
+            # 4. Student entropy too high.
+            if avg_student_entropy >= 0.99:
+                student_entropy_high_counter += 1
+            else:
+                student_entropy_high_counter = 0
+            if student_entropy_high_counter >= p_entropy:
+                print("Early stopping triggered: Student entropy stayed too high (≈1) for", p_entropy, "epochs")
+                break
+
+            # 5. KL divergence near 0.
+            if avg_kl_div < 1e-7:
+                kl_counter += 1
+            else:
+                kl_counter = 0
+            if kl_counter >= p_kl:
+                print("Early stopping triggered: KL divergence remained near 0 for", p_kl, "epochs")
+                break
+
+            # 6. Teacher entropy too low.
+            if avg_teacher_entropy <= 0.01:
+                teacher_entropy_low_counter += 1
+            else:
+                teacher_entropy_low_counter = 0
+            if teacher_entropy_low_counter >= p_entropy_low:
+                print("Early stopping triggered: Teacher entropy stayed too low (≈0) for", p_entropy_low, "epochs")
+                break
+
+            # 7. Validation-based early stopping every 100 epochs.
             if (epoch + 1) % 100 == 0 or (epoch + 1) == self.num_epochs:
                 self.benchmark.model = self.model
                 student_results = self.benchmark.run_all_benchmarks()
@@ -290,7 +338,34 @@ class DINO:
                 validation_results["student"].append(student_results)
                 validation_results["teacher"].append(teacher_results)
 
-                # Print a table-style result.
+                # Compute mean validation scores (using, for example, roc_auc).
+                current_teacher_val = sum([v["roc_auc"] for v in teacher_results.values()]) / len(teacher_results)
+                current_student_val = sum([v["roc_auc"] for v in student_results.values()]) / len(student_results)
+
+                # For condition (7): teacher validation improvement.
+                if current_teacher_val > best_teacher_val:
+                    best_teacher_val = current_teacher_val
+                    teacher_val_counter = 0
+                else:
+                    teacher_val_counter += 1
+                if teacher_val_counter >= p_val_teacher:
+                    print("Early stopping triggered: Teacher validation metric hasn't improved for", p_val_teacher, "validations")
+                    break
+
+                # For condition (8): student better than teacher for last validations.
+                if current_student_val > current_teacher_val:
+                    student_vs_teacher_counter += 1
+                else:
+                    student_vs_teacher_counter = 0
+                if student_vs_teacher_counter >= p_val_student_vs_teacher:
+                    print("Early stopping triggered: Student validation metric is better than teacher for", p_val_student_vs_teacher, "consecutive validations")
+                    break
+
+                # Optionally, save these validation scores.
+                last_teacher_val = current_teacher_val
+                last_student_val = current_student_val
+
+                # Also, print a summary table.
                 header = f"{'Benchmark':<50} {'Student AUC':<12} {'Student R2':<12} {'Teacher AUC':<12} {'Teacher R2':<12}"
                 print("\n" + header)
                 print("-" * (len(header) + 10))
@@ -301,19 +376,203 @@ class DINO:
                     t_r2 = teacher_results[bench]['gc_r2']
                     print(f"{bench:<50} {s_auc:<12.4f} {s_r2:<12.4f} {t_auc:<12.4f} {t_r2:<12.4f}")
                 print("-" * (len(header) + 10))
+                print(f"Mean Student AUC: {current_student_val:<12.4f} | Mean Teacher AUC: {current_teacher_val:<12.4f}")
 
-                mean_student_auc = sum([v['roc_auc'] for v in student_results.values()]) / len(student_results)
-                mean_student_r2 = sum([v['gc_r2'] for v in student_results.values()]) / len(student_results)
-                mean_teacher_auc = sum([v['roc_auc'] for v in teacher_results.values()]) / len(teacher_results)
-                mean_teacher_r2 = sum([v['gc_r2'] for v in teacher_results.values()]) / len(teacher_results)
-
-                print(f"Mean Student AUC: {mean_student_auc:<12.4f} | Mean Student R2: {mean_student_r2:<12.4f}")
-                print(f"Mean Teacher AUC: {mean_teacher_auc:<12.4f} | Mean Teacher R2: {mean_teacher_r2:<12.4f}")
-                print("-" * (len(header) + 10))
-
-                self.benchmark.model = self.model
-
+        self.validation_results = validation_results  # Store the recorded validation results.
         return validation_results
+
+    # def train_dino(self, accumulation_steps=10):
+    #     """
+    #     Train the DINO-DNA framework with gradient accumulation to handle small batch sizes.
+        
+    #     For each batch:
+    #     - Computes the teacher output for the global view.
+    #     - Generates subsequence and masked views.
+    #     - Merges all views into a single tensor to compute the student forward pass in one call.
+    #     - Computes loss and normalized entropies for each view.
+    #     - Accumulates gradients over `accumulation_steps` batches.
+    #     - Performs backpropagation and updates the student optimizer after accumulation.
+    #     - Updates the teacher network and the center vector.
+    #     - Cleans up intermediate variables to free memory.
+
+    #     Args:
+    #         accumulation_steps (int): Number of batches to accumulate gradients over before updating parameters.
+    #     """
+
+    #     validation_results = {
+    #         "student": [],
+    #         "teacher": []
+    #     }
+
+    #     for epoch in range(self.num_epochs):
+    #         self.teacher_model.eval()
+    #         self.model.train()
+
+    #         total_loss = 0.0
+    #         total_teacher_std = 0.0
+    #         total_teacher_entropy = 0.0
+    #         total_student_entropy = 0.0
+    #         batch_count = 0
+    #         step_count = 0  # Counter for gradient accumulation steps
+    #         epoch_kl_div = 0.0  # Accumulate batch average KL divergence for the epoch
+
+    #         pbar = tqdm(self.dataloader, desc=f"Epoch {epoch+1}/{self.num_epochs}", leave=False)
+    #         for batch in pbar:
+    #             try:
+    #                 # Do not clear gradients immediately; accumulate them
+    #                 global_view = batch["global"].to(self.device_student)
+
+    #                 # Compute teacher output on teacher device then move to student device
+    #                 with torch.no_grad():
+    #                     teacher_output = self.teacher_model(global_view.to(self.device_teacher))
+    #                     teacher_output = teacher_output.to(self.device_student)
+
+    #                 # Compute teacher statistics
+    #                 batch_teacher_std = teacher_output.std(dim=0).mean().item()
+    #                 teacher_probs = F.softmax(teacher_output, dim=1)
+    #                 teacher_entropy = - (teacher_probs * torch.log(teacher_probs + 1e-7)).sum(dim=1).mean().item()
+    #                 max_entropy = math.log(teacher_output.size(1))
+    #                 normalized_teacher_entropy = teacher_entropy / max_entropy
+
+    #                 # Combine views: global + subsequence + masked
+    #                 student_views = [batch[k] for k in batch.keys()]
+    #                 n_views = len(student_views)
+    #                 merged_views = torch.cat(student_views, dim=0).to(self.device_student)  # [n_views * batch_size, context_length]
+
+    #                 # Student forward pass in one call
+    #                 merged_student_outputs = self.model(merged_views)  # [n_views * batch_size, projection_dim]
+    #                 batch_size = global_view.size(0)
+    #                 student_outputs = merged_student_outputs.view(n_views, batch_size, -1)
+
+    #                 # Compute loss and accumulate normalized student entropy
+    #                 loss_sum = 0.0
+    #                 student_entropies = []
+    #                 for view_out in student_outputs:
+    #                     loss_sum += self.dino_loss(view_out, teacher_output, self.tps, self.tpt, self.center)
+    #                     s_probs = F.softmax(view_out, dim=1)
+    #                     s_entropy = - (s_probs * torch.log(s_probs + 1e-7)).sum(dim=1).mean().item()
+    #                     student_entropies.append(s_entropy)
+
+    #                 loss = loss_sum / n_views
+    #                 avg_student_entropy = sum(student_entropies) / len(student_entropies)
+    #                 normalized_student_entropy = avg_student_entropy / max_entropy
+
+    #                 # Compute KL divergence between teacher and each student view,
+    #                 # then average over views to obtain the batch average.
+    #                 kl_div_sum = 0.0
+    #                 for view_out in student_outputs:
+    #                     # Compute student log probabilities (with temperature scaling).
+    #                     student_log_probs = F.log_softmax(view_out, dim=1)
+    #                     # Compute teacher probabilities (with temperature scaling and center adjustment).
+    #                     teacher_probs_scaled = F.softmax(teacher_output, dim=1)
+    #                     kl_div = F.kl_div(student_log_probs, teacher_probs_scaled, reduction='batchmean')
+    #                     kl_div_sum += kl_div.item()
+    #                 batch_avg_kl_div = kl_div_sum / n_views
+    #                 epoch_kl_div += batch_avg_kl_div
+
+    #                 # Skip the batch if loss is NaN
+    #                 if torch.isnan(loss):
+    #                     self.optimizer.zero_grad()
+    #                     self.clean_up_intermediates(
+    #                         global_view,  student_views, merged_views, merged_student_outputs, 
+    #                         student_outputs, teacher_output, loss)
+    #                     continue
+
+    #                 # Scale loss to simulate larger batch size and accumulate gradients
+    #                 scaled_loss = loss / accumulation_steps
+    #                 scaled_loss.backward()  # Accumulates gradients
+
+    #                 # Update metrics for the current batch
+    #                 total_loss += loss.item()
+    #                 total_teacher_std += batch_teacher_std
+    #                 total_teacher_entropy += normalized_teacher_entropy
+    #                 total_student_entropy += normalized_student_entropy
+    #                 batch_count += 1
+    #                 step_count += 1
+
+    #                 # Perform optimization step after accumulating gradients for `accumulation_steps` batches
+    #                 if step_count % accumulation_steps == 0:
+    #                     self.optimizer.step()
+    #                     self.optimizer.zero_grad()
+
+    #                     # Update teacher network via EMA
+    #                     self.update_teacher()
+
+    #                     # Update center vector with teacher output
+    #                     with torch.no_grad():
+    #                         self.update_center(teacher_output)
+
+    #                 # Update tqdm postfix with current batch loss
+    #                 pbar.set_postfix({'loss': f"{loss.item():.3f}"})
+
+    #                 # Clean up intermediates after each batch
+    #                 self.clean_up_intermediates(
+    #                     global_view, student_views, merged_views, 
+    #                     merged_student_outputs, student_outputs,
+    #                      teacher_output, loss)
+
+    #             except RuntimeError as e:
+    #                 if "out of memory" in str(e):
+    #                     print("CUDA OOM error encountered, cleaning up and skipping this batch.")
+    #                     self.optimizer.zero_grad()
+    #                     torch.cuda.empty_cache()
+    #                     gc.collect()
+    #                     continue
+    #                 else:
+    #                     raise e
+
+    #         # If there are remaining accumulated gradients at the end of the epoch, update parameters
+    #         if step_count % accumulation_steps != 0:
+    #             self.optimizer.step()
+    #             self.optimizer.zero_grad()
+                
+    #             self.update_teacher()
+    #             with torch.no_grad():
+    #                 self.update_center(teacher_output)
+
+    #         # Compute epoch averages
+    #         avg_loss = total_loss / batch_count if batch_count > 0 else float('nan')
+    #         avg_teacher_std = total_teacher_std / batch_count if batch_count > 0 else float('nan')
+    #         avg_teacher_entropy = total_teacher_entropy / batch_count if batch_count > 0 else float('nan')
+    #         avg_student_entropy = total_student_entropy / batch_count if batch_count > 0 else float('nan')
+    #         avg_kl_div = epoch_kl_div / batch_count if batch_count > 0 else float('nan')
+    #         print(f"Epoch {epoch+1}/{self.num_epochs}, Loss: {avg_loss:.3}, T_Std: {avg_teacher_std:.3f}, "
+    #             f"T_Ent: {avg_teacher_entropy:.3f}, S_Ent: {avg_student_entropy:.3f}, KL_Div: {avg_kl_div:.3f}")
+
+    #         # Run benchmarks every 150 epochs
+    #         if (epoch + 1) % 100 == 0 or (epoch + 1) == self.num_epochs:
+    #             self.benchmark.model = self.model
+    #             student_results = self.benchmark.run_all_benchmarks()
+    #             self.benchmark.model = self.teacher_model
+    #             teacher_results = self.benchmark.run_all_benchmarks()
+
+    #             validation_results["student"].append(student_results)
+    #             validation_results["teacher"].append(teacher_results)
+
+    #             # Print a table-style result.
+    #             header = f"{'Benchmark':<50} {'Student AUC':<12} {'Student R2':<12} {'Teacher AUC':<12} {'Teacher R2':<12}"
+    #             print("\n" + header)
+    #             print("-" * (len(header) + 10))
+    #             for bench in student_results.keys():
+    #                 s_auc = student_results[bench]['roc_auc']
+    #                 s_r2 = student_results[bench]['gc_r2']
+    #                 t_auc = teacher_results[bench]['roc_auc']
+    #                 t_r2 = teacher_results[bench]['gc_r2']
+    #                 print(f"{bench:<50} {s_auc:<12.4f} {s_r2:<12.4f} {t_auc:<12.4f} {t_r2:<12.4f}")
+    #             print("-" * (len(header) + 10))
+
+    #             mean_student_auc = sum([v['roc_auc'] for v in student_results.values()]) / len(student_results)
+    #             mean_student_r2 = sum([v['gc_r2'] for v in student_results.values()]) / len(student_results)
+    #             mean_teacher_auc = sum([v['roc_auc'] for v in teacher_results.values()]) / len(teacher_results)
+    #             mean_teacher_r2 = sum([v['gc_r2'] for v in teacher_results.values()]) / len(teacher_results)
+
+    #             print(f"Mean Student AUC: {mean_student_auc:<12.4f} | Mean Student R2: {mean_student_r2:<12.4f}")
+    #             print(f"Mean Teacher AUC: {mean_teacher_auc:<12.4f} | Mean Teacher R2: {mean_teacher_r2:<12.4f}")
+    #             print("-" * (len(header) + 10))
+
+    #             self.benchmark.model = self.model
+
+    #     return validation_results
 
 ####################################
 # OPTUNA
